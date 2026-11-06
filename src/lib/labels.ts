@@ -25,6 +25,7 @@ export const surveyIssue: Record<string, string> = {
 
 export const quoteStatus: LabelMap = {
   draft: { label: "قيد الإعداد", tone: "neutral" },
+  review: { label: "بانتظار المراجعة", tone: "warning" },
   sent: { label: "مرسل", tone: "info" },
   accepted: { label: "مقبول", tone: "success" },
   rejected: { label: "مرفوض", tone: "danger" },
@@ -111,8 +112,9 @@ export const maintenanceResult: LabelMap = {
 
 export const customerType: Record<string, string> = {
   company: "شركة",
-  government: "جهة حكومية",
+  establishment: "مؤسسة",
   individual: "فرد",
+  government: "جهة حكومية",
 };
 
 export const technicianAvailability: LabelMap = {
@@ -209,6 +211,9 @@ export const auditAction: Record<string, string> = {
   invitation_accepted: "قبول دعوة",
   permission_change: "تغيير صلاحيات",
   member_status: "تغيير حالة عضوية",
+  item_added: "إضافة بند",
+  item_updated: "تعديل بند",
+  item_deleted: "حذف بند",
 };
 
 export const auditEntity: Record<string, string> = {
@@ -222,6 +227,7 @@ export const auditEntity: Record<string, string> = {
   work_order: "أمر عمل",
   visit: "زيارة",
   quotation: "عرض سعر",
+  brand: "ماركة",
   maintenance: "سجل صيانة",
   attachment: "مرفق",
   technician_customer: "إسناد فني لعميل",
@@ -235,3 +241,32 @@ export const auditEntity: Record<string, string> = {
 export function toOptions(map: Record<string, string | { label: string }>) {
   return Object.entries(map).map(([value, v]) => ({ value, label: typeof v === "string" ? v : v.label }));
 }
+
+/** أنواع إشعارات أنشطة الفريق والمتابعة (لتفضيلات كل مستخدم). المجموعة تحدد العنوان في صفحة التفضيلات. */
+export const notificationKinds: { kind: string; label: string; group: string }[] = [
+  { kind: "visit_created", label: "إنشاء زيارة صيانة", group: "أنشطة الفنيين" },
+  { kind: "survey_created", label: "إنشاء زيارة معاينة", group: "أنشطة الفنيين" },
+  { kind: "visit_started", label: "بدء زيارة ميدانية", group: "أنشطة الفنيين" },
+  { kind: "visit_closed", label: "إنهاء زيارة صيانة", group: "أنشطة الفنيين" },
+  { kind: "survey_completed", label: "تسجيل نتائج معاينة", group: "أنشطة الفنيين" },
+  { kind: "visit_notes", label: "إضافة ملاحظات على زيارة", group: "أنشطة الفنيين" },
+  { kind: "photo_added", label: "إضافة صور", group: "أنشطة الفنيين" },
+  { kind: "device_created", label: "إضافة جهاز جديد", group: "أنشطة الفنيين" },
+  { kind: "fault_reported", label: "تسجيل عطل", group: "أنشطة الفنيين" },
+  { kind: "maintenance_done", label: "تسجيل صيانة مكتملة", group: "أنشطة الفنيين" },
+  { kind: "due_rescheduled", label: "تعديل موعد صيانة دورية", group: "أنشطة الفنيين" },
+  { kind: "quote_created", label: "إنشاء عرض سعر", group: "عروض الأسعار" },
+  { kind: "quote_updated", label: "تعديل عرض سعر", group: "عروض الأسعار" },
+  { kind: "quote_review", label: "عرض بانتظار المراجعة", group: "عروض الأسعار" },
+  { kind: "quote_sent", label: "إرسال عرض للعميل", group: "عروض الأسعار" },
+  { kind: "quote_accepted", label: "قبول العميل للعرض", group: "عروض الأسعار" },
+  { kind: "quote_rejected", label: "رفض العميل للعرض", group: "عروض الأسعار" },
+  { kind: "quote_returned", label: "إرجاع عرض للإعداد", group: "عروض الأسعار" },
+  { kind: "quotes_pending", label: "ملخص العروض بانتظار المراجعة", group: "عروض الأسعار" },
+  { kind: "maintenance_due_soon", label: "اقتراب موعد صيانة", group: "الصيانة والمتابعة" },
+  { kind: "maintenance_due_today", label: "حلول موعد الصيانة", group: "الصيانة والمتابعة" },
+  { kind: "maintenance_overdue", label: "تأخر الصيانة", group: "الصيانة والمتابعة" },
+  { kind: "maintenance_escalation", label: "تصعيد تأخر الصيانة", group: "الصيانة والمتابعة" },
+  { kind: "maintenance_digest", label: "الملخص اليومي للصيانة", group: "الصيانة والمتابعة" },
+  { kind: "visits_unclosed", label: "زيارات لم تُغلق", group: "الصيانة والمتابعة" },
+];

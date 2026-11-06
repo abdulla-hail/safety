@@ -7,13 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 import { dbErrorMessage } from "@/lib/errors";
 import { isUuid } from "@/lib/list";
 import { parseAmount } from "@/lib/money";
+import { resolveBrand } from "@/lib/brands";
 import { siteUrl } from "@/lib/codes";
-import { mailConfigured, sendMail } from "@/lib/mail";
+import { documentEmail, loadCompanyMail, mailFailureText, sendCompanyMail } from "@/lib/company-mail";
 import { fail, str, strOrNull, type ActionState } from "@/lib/action-state";
 
 /** عرض سعر من معاينة منتهية (يعيد العرض القائم إن وُجد) */
 export async function createQuoteFromVisit(prev: ActionState, fd: FormData): Promise<ActionState> {
-  const ctx = await orgForAction("quotes.manage");
+  const ctx = await orgForAction("quotes.manage", "quotes.create");
   const visit = str(fd, "visit_id");
   if (!ctx || !isUuid(visit)) return fail(prev, fd, "ليست لديك صلاحية إنشاء عروض الأسعار.");
   const supabase = await createClient();
@@ -25,7 +26,7 @@ export async function createQuoteFromVisit(prev: ActionState, fd: FormData): Pro
 
 /** عرض سعر يدوي لعميل (وفرعه اختياريًا) يبدأ «قيد الإعداد» */
 export async function createManualQuote(prev: ActionState, fd: FormData): Promise<ActionState> {
-  const ctx = await orgForAction("quotes.manage");
+  const ctx = await orgForAction("quotes.manage", "quotes.create");
   if (!ctx) return fail(prev, fd, "ليست لديك صلاحية إنشاء عروض الأسعار.");
   const customer = str(fd, "customer_id");
   const site = str(fd, "site_id");
@@ -42,7 +43,7 @@ export async function createManualQuote(prev: ActionState, fd: FormData): Promis
 }
 
 export async function updateQuote(prev: ActionState, fd: FormData): Promise<ActionState> {
-  const ctx = await orgForAction("quotes.manage");
+  const ctx = await orgForAction("quotes.manage", "quotes.create");
   const id = str(fd, "id");
   if (!ctx || !isUuid(id)) return fail(prev, fd, "ليست لديك صلاحية تعديل عروض الأسعار.");
   const issue = str(fd, "issue_date");
@@ -63,7 +64,7 @@ export async function updateQuote(prev: ActionState, fd: FormData): Promise<Acti
 export interface LineState { ok: boolean; message: string; errors?: Record<string, string> }
 
 export async function saveQuoteItem(input: { quoteId: string; id?: string; fields: Record<string, string> }): Promise<LineState> {
-  const ctx = await orgForAction("quotes.manage");
+  const ctx = await orgForAction("quotes.manage", "quotes.create");
   if (!ctx || !isUuid(input.quoteId)) return { ok: false, message: "ليست لديك صلاحية تعديل عروض الأسعار." };
   const g = (k: string) => (typeof input.fields[k] === "string" ? input.fields[k].trim() : "");
   const errors: Record<string, string> = {};
@@ -74,8 +75,10 @@ export async function saveQuoteItem(input: { quoteId: string; id?: string; field
   const price = parseAmount(g("unit_price") || "0");
   if (price === null) errors.unit_price = "سعر غير صالح";
   if (Object.keys(errors).length) return { ok: false, message: "راجع الحقول المعلَّمة؛ لم يُحفظ شيء.", errors };
-  const row = { description: description.slice(0, 1000), quantity: qty, unit_price: price };
   const supabase = await createClient();
+  const brand = await resolveBrand(supabase, ctx.orgId, g("brand"), ctx.canAny("catalog.manage", "quotes.manage"));
+  if (!brand.ok) return { ok: false, message: brand.message, errors: { brand: "اختر من القائمة" } };
+  const row = { description: description.slice(0, 1000), quantity: qty, unit_price: price, brand_id: brand.id, brand: brand.name };
   const res = input.id && isUuid(input.id)
     ? await supabase.from("quotation_items").update(row).eq("id", input.id).eq("quotation_id", input.quoteId).select("id")
     : await supabase.from("quotation_items").insert({ ...row, company_id: ctx.orgId, quotation_id: input.quoteId, sort_order: Date.now() % 2_000_000_000 }).select("id");
@@ -86,7 +89,7 @@ export async function saveQuoteItem(input: { quoteId: string; id?: string; field
 }
 
 export async function deleteQuoteItem(input: { quoteId: string; id: string }): Promise<LineState> {
-  const ctx = await orgForAction("quotes.manage");
+  const ctx = await orgForAction("quotes.manage", "quotes.create");
   if (!ctx || !isUuid(input.id)) return { ok: false, message: "ليست لديك صلاحية تعديل عروض الأسعار." };
   const supabase = await createClient();
   const { data, error } = await supabase.from("quotation_items").delete().eq("id", input.id).eq("quotation_id", input.quoteId).select("id");
@@ -96,10 +99,10 @@ export async function deleteQuoteItem(input: { quoteId: string; id: string }): P
   return { ok: true, message: "حُذف البند." };
 }
 
-const STATUS = ["draft", "sent", "accepted", "rejected"];
+const STATUS = ["draft", "review", "sent", "accepted", "rejected"];
 
 export async function setQuoteStatus(prev: ActionState, fd: FormData): Promise<ActionState> {
-  const ctx = await orgForAction("quotes.manage");
+  const ctx = await orgForAction("quotes.manage", "quotes.create");
   const id = str(fd, "id");
   const status = str(fd, "status");
   if (!ctx || !isUuid(id) || !STATUS.includes(status)) return { ok: false, message: "ليست لديك صلاحية إدارة عروض الأسعار." };
@@ -108,7 +111,8 @@ export async function setQuoteStatus(prev: ActionState, fd: FormData): Promise<A
   if (error) return { ok: false, message: dbErrorMessage(error), attempt: (prev.attempt ?? 0) + 1 };
   revalidatePath(`/quotes/${id}`);
   revalidatePath("/quotes");
-  return { ok: true, message: "حُدّثت حالة العرض.", attempt: (prev.attempt ?? 0) + 1 };
+  const msg: Record<string, string> = { review: "أُرسل العرض للمراجعة؛ سيُشعَر المسؤول.", sent: "اعتُمد العرض وحُدّد كمرسل للعميل.", accepted: "سُجّل قبول العميل.", rejected: "سُجّل رفض العميل.", draft: "أُعيد العرض إلى «قيد الإعداد»." };
+  return { ok: true, message: msg[status] ?? "حُدّثت حالة العرض.", attempt: (prev.attempt ?? 0) + 1 };
 }
 
 /** أرشفة العرض (لا حذف): يتيح إنشاء عرض جديد للمعاينة نفسها */
@@ -143,16 +147,18 @@ export async function createShareLink(input: { kind: "quote" | "survey"; id: str
   let emailed = false;
   let note = "";
   if (email) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: true, url, message: "أُنشئ الرابط، لكن البريد غير صالح فلم يُرسل." };
-    if (!mailConfigured()) note = " خدمة البريد غير مهيأة في المنصة؛ انسخ الرابط وأرسله بنفسك.";
-    else {
-      const title = input.subject ?? (input.kind === "quote" ? "عرض سعر" : "تقرير معاينة");
-      const r = await sendMail(email, `${title} — ${ctx.active.organization_name}`,
-        `<div dir="rtl" style="font-family:sans-serif"><p>مرحبًا،</p><p>تجدون ${title} من ${ctx.active.organization_name} على الرابط التالي:</p><p><a href="${url}">${url}</a></p><p>الرابط صالح ${days} يومًا.</p></div>`,
-        `${title} من ${ctx.active.organization_name}: ${url} (صالح ${days} يومًا)`);
-      emailed = r.sent;
-      if (!r.sent) note = " تعذر إرسال البريد؛ انسخ الرابط وأرسله بنفسك.";
-    }
+    if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) return { ok: true, url, message: "أُنشئ الرابط، لكن البريد غير صالح فلم يُرسل." };
+    // الإرسال من بريد الشركة الرسمي وبهويتها فقط (لا اسم المنصة)
+    const [cfg, { data: co }] = await Promise.all([
+      loadCompanyMail(supabase, ctx.orgId),
+      supabase.from("companies").select("name, phone, email, primary_color").eq("id", ctx.orgId).maybeSingle(),
+    ]);
+    const company = cfg?.sender_name || co?.name || ctx.active.organization_name;
+    const title = input.subject ?? (input.kind === "quote" ? "عرض سعر" : "تقرير معاينة");
+    const m = documentEmail({ company, title, url, days, phone: co?.phone, email: cfg?.sender_email ?? co?.email, color: co?.primary_color });
+    const r = await sendCompanyMail(cfg, { to: email, subject: `${title} — ${company}`, html: m.html, text: m.text });
+    emailed = r.sent;
+    if (!r.sent) note = ` ${mailFailureText(r)} انسخ الرابط وأرسله بنفسك.`;
   }
   revalidatePath(input.kind === "quote" ? `/quotes/${input.id}` : `/visits/${input.id}/survey`);
   return { ok: true, url, emailed, message: emailed ? `أُرسل الرابط إلى ${email}.` : `أُنشئ رابط المشاركة (صالح ${days} يومًا).${note}` };

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Form from "next/form";
 import Icon from "@/components/ui/Icon";
 import InstallAppButton from "@/components/pwa/InstallAppButton";
+import NotificationBell from "@/components/layout/NotificationBell";
 import { switchOrganization } from "@/app/(app)/actions";
 
 interface OrgOption {
@@ -17,6 +18,7 @@ interface TopbarProps {
   roleName: string;
   avatarUrl: string | null;
   unreadCount: number;
+  userId: string | null;
   orgs: OrgOption[];
   activeOrgId: string | null;
   canSearch: boolean;
@@ -24,7 +26,7 @@ interface TopbarProps {
 }
 
 export default function Topbar({
-  tenantName, userName, roleName, avatarUrl, unreadCount, orgs, activeOrgId, canSearch, onMenuClick,
+  tenantName, userName, roleName, avatarUrl, unreadCount, userId, orgs, activeOrgId, canSearch, onMenuClick,
 }: TopbarProps) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-card px-4 sm:px-6 print:hidden">
@@ -58,15 +60,7 @@ export default function Topbar({
           <Icon name="scan" className="size-5" />
         </Link>
 
-        <Link href="/notifications" className="icon-hover relative rounded-full p-2 text-slate-600 transition hover:bg-brand-soft hover:text-brand-strong"
-              aria-label={unreadCount > 0 ? `الإشعارات (${unreadCount} غير مقروءة)` : "الإشعارات"}>
-          <Icon name="bell" className="size-5" />
-          {unreadCount > 0 && (
-            <span className="pop-enter absolute -end-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
-        </Link>
+        <NotificationBell userId={userId} initialCount={unreadCount} />
 
         <div className="flex items-center gap-3 border-s border-slate-200 ps-3">
           <div className="hidden text-start sm:block">

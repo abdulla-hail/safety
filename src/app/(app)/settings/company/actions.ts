@@ -19,11 +19,12 @@ export async function saveMaintenanceSettings(prev: ActionState, fd: FormData): 
   const ctx = await orgForAction("settings.branding");
   if (!ctx) return fail(prev, fd, "ليست لديك صلاحية إدارة إعدادات الشركة.");
   const n = (k: string) => Number.parseInt(str(fd, k), 10);
-  const months = n("default_interval_months"), alert = n("maintenance_alert_days"), esc = n("escalation_days");
+  const lead = [...new Set(fd.getAll("lead_days").map((x) => Number.parseInt(String(x), 10)).filter((x) => x >= 1 && x <= 90))].sort((a, b) => b - a);
+  const months = n("default_interval_months"), alert = lead[0] ?? 0, esc = n("escalation_days");
   const policy = str(fd, "schedule_policy");
   const errors: Record<string, string> = {};
   if (!(months >= 1 && months <= 60)) errors.default_interval_months = "بين 1 و60";
-  if (!(alert >= 1 && alert <= 90)) errors.maintenance_alert_days = "بين 1 و90";
+  if (!lead.length) errors.lead_days = "اختر مرحلة تنبيه واحدة على الأقل";
   if (!(esc >= 1 && esc <= 90)) errors.escalation_days = "بين 1 و90";
   if (!["from_completion", "fixed"].includes(policy)) errors.schedule_policy = "اختر السياسة";
   if (Object.keys(errors).length) return fail(prev, fd, "يرجى تصحيح الحقول المحددة.", errors);
@@ -32,6 +33,8 @@ export async function saveMaintenanceSettings(prev: ActionState, fd: FormData): 
     p_company: ctx.orgId, p_default_months: months, p_policy: policy, p_alert_days: alert, p_escalation_days: esc,
   });
   if (error) return fail(prev, fd, dbErrorMessage(error));
+  const { error: e2 } = await supabase.rpc("set_alert_lead_days", { p_company: ctx.orgId, p_days: lead });
+  if (e2) return fail(prev, fd, dbErrorMessage(e2));
   revalidatePath("/settings/company");
   return { ok: true, message: "حُفظت إعدادات الصيانة. تُطبَّق على الأجهزة الجديدة والحسابات القادمة دون تغيير مواعيد الأجهزة القائمة.", attempt: (prev.attempt ?? 0) + 1 };
 }

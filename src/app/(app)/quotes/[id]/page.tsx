@@ -12,7 +12,8 @@ import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/list";
 import { formatDate, formatDateTime, isFuture } from "@/lib/format";
-import { quoteStatus } from "@/lib/labels";
+import { auditAction, quoteStatus } from "@/lib/labels";
+import { brandNames } from "@/lib/brands";
 import { archiveQuote, revokeShareLink, setQuoteStatus, updateQuote } from "../actions";
 
 export const metadata = { title: "عرض سعر | عين السلامة" };
@@ -20,27 +21,40 @@ export const metadata = { title: "عرض سعر | عين السلامة" };
 type Q = {
   id: string; ref_no: string; status: string; title: string | null; issue_date: string; valid_until: string | null; vat_rate: number; notes: string | null; terms: string | null;
   sent_at: string | null; decided_at: string | null; decision_note: string | null; archived_at: string | null; visit_id: string | null;
+  created_by: string | null; created_at: string; submitted_at: string | null; approved_by: string | null; approved_at: string | null;
   customer: { id: string; name: string; email: string | null } | null; site: { id: string; name: string } | null; visit: { ref_no: string } | null;
 };
 
 /** عرض السعر: تعديل البيانات والبنود والأسعار ما دام «قيد الإعداد»، ثم مرسل ← مقبول/مرفوض. الطباعة والمشاركة في أي وقت. */
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await requireOrg("quotes.view", "quotes.manage");
+  const ctx = await requireOrg("quotes.view", "quotes.manage", "quotes.create");
   if (!isUuid(id)) notFound();
   const supabase = await createClient();
-  const [{ data: raw }, items, links] = await Promise.all([
-    supabase.from("quotations").select("id, ref_no, status, title, issue_date, valid_until, vat_rate, notes, terms, sent_at, decided_at, decision_note, archived_at, visit_id, "
+  const isManager = ctx.can("quotes.manage");
+  const [{ data: raw }, items, links, brands, techs, history] = await Promise.all([
+    supabase.from("quotations").select("id, ref_no, status, title, issue_date, valid_until, vat_rate, notes, terms, sent_at, decided_at, decision_note, archived_at, visit_id, created_by, created_at, submitted_at, approved_by, approved_at, "
       + "customer:customers(id, name, email), site:customer_sites(id, name), visit:visits(ref_no)").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
-    supabase.from("quotation_items").select("id, description, quantity, unit_price").eq("quotation_id", id).order("sort_order").order("created_at"),
-    supabase.from("share_links").select("id, created_at, expires_at, revoked_at").eq("company_id", ctx.orgId).eq("kind", "quote").eq("entity_id", id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("quotation_items").select("id, description, quantity, unit_price, brand").eq("quotation_id", id).order("sort_order").order("created_at"),
+    isManager ? supabase.from("share_links").select("id, created_at, expires_at, revoked_at").eq("company_id", ctx.orgId).eq("kind", "quote").eq("entity_id", id).order("created_at", { ascending: false }).limit(10) : null,
+    brandNames(supabase, ctx.orgId),
+    supabase.from("technicians").select("user_id, full_name").eq("company_id", ctx.orgId).not("user_id", "is", null),
+    // سجل الإنشاء والتعديلات (يظهر لمن يملك قراءة سجل التدقيق)
+    supabase.from("company_audit_log").select("id, action, actor_user_id, actor_email, details, created_at").eq("company_id", ctx.orgId)
+      .eq("target_type", "quotation").eq("target_id", id).order("created_at", { ascending: false }).limit(50),
   ]);
   const q = raw as unknown as Q | null;
   if (!q) notFound();
-  const manage = ctx.can("quotes.manage") && !q.archived_at;
+  const manage = isManager && !q.archived_at;
+  const owner = !q.archived_at && ctx.can("quotes.create") && q.created_by === ctx.user.id;
   const draft = q.status === "draft";
+  // التعديل: المسؤول في «قيد الإعداد» و«بانتظار المراجعة»، والفني لمسودته فقط
+  const canEdit = (manage && (draft || q.status === "review")) || (owner && draft);
   const lines = items.data ?? [];
-  const activeLinks = (links.data ?? []).filter((l) => !l.revoked_at && isFuture(l.expires_at));
+  const activeLinks = (links?.data ?? []).filter((l) => !l.revoked_at && isFuture(l.expires_at));
+  const techName = new Map((techs.data ?? []).map((x) => [x.user_id as string, x.full_name]));
+  const nameOf = (uid: string | null, email?: string | null) => !uid ? "النظام" : uid === ctx.user.id ? "أنت" : techName.get(uid) ?? email ?? "عضو في الشركة";
+  const createdEntry = (history.data ?? []).find((h) => h.action === "create");
   const back = `/quotes/${id}`;
   const st = (status: string, label: string, cls = btnSecondary, confirm?: string) =>
     <ActionButton action={setQuoteStatus} hidden={{ id, status }} label={label} className={cls} confirm={confirm} />;
@@ -60,9 +74,19 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
           {q.sent_at && <span>أُرسل: {formatDateTime(q.sent_at)}</span>}
           {q.decided_at && <span>القرار: {formatDateTime(q.decided_at)}</span>}
           {q.decision_note && <span className="text-slate-600">«{q.decision_note}»</span>}
+          <span className="text-slate-600">أنشأه: <b>{nameOf(q.created_by, createdEntry?.actor_email)}</b> في {formatDateTime(q.created_at)}</span>
+          {q.submitted_at && <span className="text-slate-600">أُرسل للمراجعة: {formatDateTime(q.submitted_at)}</span>}
+          {q.approved_at && <span className="text-slate-600">اعتمده: <b>{nameOf(q.approved_by)}</b> في {formatDateTime(q.approved_at)}</span>}
         </div>
+        {(manage || owner) && (
+          <div className="flex flex-wrap gap-2">
+            {draft && owner && !manage && st("review", "إرسال للمراجعة", btnPrimary, "إرسال العرض للمسؤول للمراجعة والاعتماد؟ لن تتمكن من تعديله حتى يُعاد إليك.")}
+            {q.status === "review" && owner && !manage && st("draft", "سحب من المراجعة للتعديل")}
+          </div>
+        )}
         {manage && (
           <div className="flex flex-wrap gap-2">
+            {q.status === "review" && <>{st("sent", "اعتماد وإرسال للعميل", btnPrimary, "اعتماد العرض وتحديده كمرسل للعميل؟")}{st("draft", "إعادة للفني للتعديل")}</>}
             {draft && st("sent", "اعتماد كمرسل للعميل", btnPrimary, "تحديد العرض كمرسل؟ تتجمد البنود والأسعار (يمكن إرجاعه للإعداد لاحقًا).")}
             {q.status === "sent" && <>{st("accepted", "قبِل العميل", btnPrimary)}{st("rejected", "رفض العميل", btnDangerOutline)}{st("draft", "إرجاع للإعداد")}</>}
             {(q.status === "accepted" || q.status === "rejected") && st("draft", "إرجاع للإعداد", btnSecondary, "إرجاع العرض إلى «قيد الإعداد» للتعديل؟")}
@@ -72,14 +96,14 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
       <section className={card}>
         <div className={cardHeader}><h2 className={cardTitle}>البنود والأسعار ({lines.length})</h2>
-          {!draft && <span className="text-xs text-slate-500">للتعديل: «إرجاع للإعداد»</span>}</div>
-        <div className="p-4"><QuoteItems quoteId={id} lines={lines} vatRate={Number(q.vat_rate)} locked={!manage || !draft} /></div>
+          {!canEdit && <span className="text-xs text-slate-500">{q.status === "review" && owner ? "بانتظار مراجعة المسؤول" : "للتعديل: «إرجاع للإعداد»"}</span>}</div>
+        <div className="p-4"><QuoteItems quoteId={id} lines={lines} vatRate={Number(q.vat_rate)} locked={!canEdit} brands={brands} canAddBrand={ctx.canAny("catalog.manage", "quotes.manage")} /></div>
       </section>
 
       <section className={card}>
         <div className={cardHeader}><h2 className={cardTitle}>بيانات العرض</h2></div>
         <div className="p-5">
-          {manage && draft ? (
+          {canEdit ? (
             <EntityForm action={updateQuote} submitLabel="حفظ بيانات العرض"
               initial={{ id, title: q.title ?? "", issue_date: q.issue_date, valid_until: q.valid_until ?? "", vat: Number(q.vat_rate) > 0 ? "15" : "0", notes: q.notes ?? "", terms: q.terms ?? "" }}
               fields={[
@@ -120,6 +144,24 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               </ul>
             )}
           </div>
+        </section>
+      )}
+
+      {(history.data ?? []).length > 0 && (
+        <section className={card}>
+          <div className={cardHeader}><h2 className={cardTitle}>سجل الإنشاء والتعديلات</h2></div>
+          <ul className="divide-y divide-slate-100 text-xs">
+            {(history.data ?? []).map((h) => {
+              const d = (h.details ?? {}) as { name?: string; changes?: Record<string, { from: unknown; to: unknown }> };
+              const ch = d.changes ? Object.entries(d.changes).filter(([k]) => !["updated_at"].includes(k)).map(([k, v]) => `${k}: ${String(v.from ?? "—")} ← ${String(v.to ?? "—")}`).join(" · ") : "";
+              return (
+                <li key={h.id} className="flex flex-wrap justify-between gap-2 px-5 py-2">
+                  <span><b>{auditAction[h.action] ?? h.action}</b>{d.name && h.action.startsWith("item") ? ` — ${d.name}` : ""}{ch && <span className="block text-slate-500" dir="auto">{ch}</span>}</span>
+                  <span className="text-slate-500">{nameOf(h.actor_user_id, h.actor_email)} · {formatDateTime(h.created_at)}</span>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 

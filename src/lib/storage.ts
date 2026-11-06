@@ -9,6 +9,18 @@ export async function signedUrl(supabase: SupabaseClient, bucket: string, path: 
   return error ? null : data.signedUrl;
 }
 
+/**
+ * روابط موقّعة لعدة ملفات في طلب واحد (للطباعة والتقارير): المتصفح يحمّل الصور مباشرة دون تحويل لكل صورة،
+ * فلا تفشل الصور عند طباعة تقرير بصور كثيرة. ما يتعذر توقيعه يُرجع null (يُعرض بديله /files/[id]).
+ */
+export async function signedUrls(supabase: SupabaseClient, bucket: string, paths: string[], seconds = 3600): Promise<Map<string, string>> {
+  const unique = [...new Set(paths.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(unique, seconds);
+  if (error || !data) return new Map();
+  return new Map(data.filter((x) => x.signedUrl && x.path).map((x) => [x.path as string, x.signedUrl as string]));
+}
+
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 
 export function safeFileName(name: string) {

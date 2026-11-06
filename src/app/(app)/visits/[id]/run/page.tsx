@@ -7,6 +7,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import MultiSelectForm from "@/components/ui/MultiSelectForm";
 import PhasePending from "@/components/PhasePending";
 import UploadForm, { PHOTO_STAGES } from "@/components/attachments/UploadForm";
+import SafeImage from "@/components/attachments/SafeImage";
 import { btnDangerOutline, btnSecondary, btnSm, card, cardHeader, cardTitle, link } from "@/components/ui/styles";
 import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
@@ -36,8 +37,7 @@ function PhotoTile({ p, deviceName, canDelete, visitId }: { p: Photo; deviceName
   return (
     <li className="w-28 overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] text-slate-600">
       {p.url && p.mime_type?.startsWith("image/")
-        // eslint-disable-next-line @next/next/no-img-element
-        ? <a href={p.url} target="_blank" rel="noopener noreferrer" title="فتح الصورة"><img src={p.url} alt={p.file_name} className="h-20 w-full object-cover" /></a>
+        ? <a href={p.url} target="_blank" rel="noopener noreferrer" title="فتح الصورة"><SafeImage src={p.url} alt={p.file_name} className="h-20 w-full object-cover" /></a>
         : p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer" className="flex h-20 items-center justify-center bg-slate-50 font-bold">PDF</a>
           : <span className="flex h-20 items-center justify-center bg-slate-50">غير متاح</span>}
       <div className="space-y-0.5 p-1">

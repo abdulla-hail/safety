@@ -42,7 +42,7 @@ async function AppFrame({ children }: { children: ReactNode }) {
     if (field) items.push({ label: "عملي", icon: "clock", href: "/my-work" });
     if (any("customers.view") || field) items.push({ label: "العملاء والفروع", icon: "building", href: "/customers", section: "العمل" });
     if (!fieldOnly && any("visits.view", "visits.create")) items.push({ label: "الزيارات والمعاينات", icon: "calendar", href: "/visits", section: "العمل" });
-    if (any("quotes.view", "quotes.manage")) items.push({ label: "عروض الأسعار", icon: "file", href: "/quotes", section: "العمل" });
+    if (any("quotes.view", "quotes.manage", "quotes.create")) items.push({ label: "عروض الأسعار", icon: "file", href: "/quotes", section: "العمل" });
     if (any("devices.view") || field) items.push({ label: "الأجهزة", icon: "shield", href: "/devices", section: "العمل" });
     if (phase5 && !fieldOnly && any("faults.view", "faults.update")) items.push({ label: "البلاغات والأعطال", icon: "shieldAlert", href: "/faults", section: "العمل" });
     if (any("reports.view")) items.push({ label: "التقارير", icon: "chart", href: "/reports", section: "العمل" });
@@ -50,6 +50,7 @@ async function AppFrame({ children }: { children: ReactNode }) {
     if (m.is_owner) items.push({ label: "الفريق والدعوات", icon: "userCog", href: "/team", section: "الإدارة" });
     if (any("assignments.manage")) items.push({ label: "إسناد الفنيين", icon: "link", href: "/assignments", section: "الإدارة" });
     if (any("catalog.manage")) items.push({ label: "كتالوج الأجهزة", icon: "book", href: "/catalog", section: "الإدارة" });
+    if (any("catalog.manage")) items.push({ label: "الماركات", icon: "book", href: "/brands", section: "الإدارة" });
     if (any("settings.branding")) items.push({ label: "هوية الشركة", icon: "settings", href: "/settings/company", section: "الإدارة" });
     if (m.is_owner) items.push({ label: "سجل التدقيق", icon: "history", href: "/settings/audit", section: "الإدارة" });
   }
@@ -70,6 +71,7 @@ async function AppFrame({ children }: { children: ReactNode }) {
     <DashboardShell
       tenantName={m?.organization_name ?? (ctx.platformRole ? "إدارة المنصة" : "عين السلامة")}
       userName={ctx.user.name}
+      userId={ctx.user.id}
       roleName={roleName}
       avatarUrl={ctx.user.avatarUrl}
       logoUrl={logoUrl}

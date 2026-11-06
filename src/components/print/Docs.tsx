@@ -13,13 +13,13 @@ export interface DocSite { name: string; city?: string | null; address?: string 
 export interface SurveyDocData {
   ref_no: string; scheduled_start: string; actual_end: string | null; summary: string | null; recommendations: string | null; technician_notes: string | null;
   customer: { name: string; phone?: string | null } | null; site: DocSite | null; technicians: string[]; vat_rate: number; draft?: boolean;
-  items: { id: string; title: string; issue_type: string; description: string | null; quantity: number; unit_price: number; device?: string | null; device_ref?: string | null }[];
+  items: { id: string; title: string; issue_type: string; description: string | null; quantity: number; unit_price: number; brand?: string | null; device?: string | null; device_ref?: string | null }[];
   photos: { url: string | null; name: string; mime: string | null; item_id: string | null }[];
 }
 export interface QuoteDocData {
   ref_no: string; status: string; title: string | null; issue_date: string; valid_until: string | null; vat_rate: number; notes: string | null; terms: string | null;
   customer: { name: string; vat_number?: string | null; phone?: string | null } | null; site: DocSite | null; visit_ref: string | null;
-  items: { description: string; quantity: number; unit_price: number }[];
+  items: { description: string; quantity: number; unit_price: number; brand?: string | null }[];
 }
 
 const siteText = (s: DocSite | null) => s && [s.name, s.city, s.address].filter(Boolean).join(" — ");
@@ -73,7 +73,7 @@ export function SurveyDoc({ b, d }: { b: Branding; d: SurveyDocData }) {
             {d.items.map((it, i) => (
               <tr key={it.id} className="break-inside-avoid align-top">
                 <td>{i + 1}</td>
-                <td><b>{it.title}</b>{it.device_ref && <span className="block text-slate-600" dir="ltr">{it.device_ref}</span>}</td>
+                <td><b>{it.title}</b>{it.brand && <span className="block text-slate-700">الماركة: {it.brand}</span>}{it.device_ref && <span className="block text-slate-600" dir="ltr">{it.device_ref}</span>}</td>
                 <td>{surveyIssue[it.issue_type] ?? it.issue_type}</td>
                 <td className="whitespace-pre-line">{it.description ?? "—"}</td>
                 <td dir="ltr">{Number(it.quantity)}</td>
@@ -89,33 +89,34 @@ export function SurveyDoc({ b, d }: { b: Branding; d: SurveyDocData }) {
       {d.recommendations && (<><h2>التوصيات</h2><p className="whitespace-pre-line text-[11px]">{d.recommendations}</p></>)}
       {d.technician_notes && (<><h2>ملاحظات عامة</h2><p className="whitespace-pre-line text-[11px]">{d.technician_notes}</p></>)}
       {d.photos.some((p) => p.url && p.mime?.startsWith("image/")) && (
-        <>
-          <h2>الصور</h2>
+        <section className="doc-photos">
+          <h2>الصور ({d.photos.filter((p) => p.url && p.mime?.startsWith("image/")).length})</h2>
           {d.items.map((it, i) => {
             const ps = photosOf(it.id);
             return ps.length ? (
               <div key={it.id} className="mb-2 break-inside-avoid">
                 <p className="mb-1 text-[10.5px] font-bold">{i + 1}. {it.title}</p>
-                <div className="flex flex-wrap gap-2">{ps.map((p) => <Photo key={p.url} url={p.url!} name={p.name} />)}</div>
+                <div className="photo-grid">{ps.map((p) => <Photo key={p.url} url={p.url!} name={p.name} />)}</div>
               </div>
             ) : null;
           })}
           {general.length > 0 && (
             <div className="break-inside-avoid">
               <p className="mb-1 text-[10.5px] font-bold">صور عامة للموقع</p>
-              <div className="flex flex-wrap gap-2">{general.map((p) => <Photo key={p.url} url={p.url!} name={p.name} />)}</div>
+              <div className="photo-grid">{general.map((p) => <Photo key={p.url} url={p.url!} name={p.name} />)}</div>
             </div>
           )}
-        </>
+        </section>
       )}
       <Signatures boxes={["الفني المسؤول", "ممثل العميل"]} />
     </PrintDocument>
   );
 }
 
-function Photo({ url, name }: { url: string; name: string }) {
+function Photo({ url, name, caption }: { url: string; name: string; caption?: string }) {
+  // الصور تُحمَّل فورًا (لا lazy): الطباعة لا تحمّل الصور خارج الشاشة فتخرج فارغة في PDF
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt={name} loading="lazy" className="h-32 w-44 rounded border border-slate-300 object-cover" />;
+  return <figure><img src={url} alt={name} decoding="sync" />{caption && <figcaption>{caption}</figcaption>}</figure>;
 }
 
 export function QuoteDoc({ b, d }: { b: Branding; d: QuoteDocData }) {
@@ -128,15 +129,15 @@ export function QuoteDoc({ b, d }: { b: Branding; d: QuoteDocData }) {
     ]}>
       {d.title && <p className="mb-3 text-[13px] font-bold">{d.title}</p>}
       <table className="doc-table w-full text-[10.5px]">
-        <thead><tr><th>#</th><th>البيان</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+        <thead><tr><th>#</th><th>البيان</th><th>الماركة</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
         <tbody>
           {d.items.map((it, i) => (
             <tr key={i} className="break-inside-avoid align-top">
-              <td>{i + 1}</td><td className="whitespace-pre-line">{it.description}</td><td dir="ltr">{Number(it.quantity)}</td>
+              <td>{i + 1}</td><td className="whitespace-pre-line">{it.description}</td><td>{it.brand ?? "—"}</td><td dir="ltr">{Number(it.quantity)}</td>
               <td className="whitespace-nowrap">{sar(it.unit_price)}</td><td className="whitespace-nowrap font-bold">{sar(lineTotal(it))}</td>
             </tr>
           ))}
-          {d.items.length === 0 && <tr><td colSpan={5}>لا توجد بنود.</td></tr>}
+          {d.items.length === 0 && <tr><td colSpan={6}>لا توجد بنود.</td></tr>}
         </tbody>
       </table>
       <TotalsTable {...t} />

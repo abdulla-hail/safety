@@ -4,6 +4,7 @@ import { hasPhase5 } from "@/lib/schema";
 import { formatDate } from "@/lib/format";
 import { card, cardHeader, cardTitle } from "@/components/ui/styles";
 import UploadForm from "./UploadForm";
+import SafeImage from "./SafeImage";
 
 const devName = (d: unknown) => (d as { name?: string } | null)?.name;
 const STAGE: Record<string, string> = { before: "قبل الصيانة", after: "بعد الصيانة", general: "عامة", fault: "توثيق عطل", other: "مرفق آخر" };
@@ -70,8 +71,7 @@ async function AttachmentListContent({ entityType, entityId, canUpload, deviceId
                 {url ? (
                   <a href={url} target="_blank" rel="noopener noreferrer" className="block">
                     {isImg ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={url} alt={f.file_name} className="h-28 w-full bg-slate-50 object-cover" />
+                      <SafeImage src={url} alt={f.file_name} className="h-28 w-full bg-slate-50 object-cover" />
                     ) : (
                       <div className="flex h-28 items-center justify-center bg-slate-50 text-xs font-bold text-slate-500">PDF</div>
                     )}

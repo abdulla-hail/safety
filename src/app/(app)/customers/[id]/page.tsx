@@ -15,7 +15,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { customerType, deviceStatus, maintenanceResult, quoteStatus, visitStatus, visitType } from "@/lib/labels";
 import MapView from "@/components/map/MapView";
 import LocationPicker from "@/components/map/LocationPicker";
-import { directionsUrl, validLatLng } from "@/lib/geo";
+import { directionsUrl, mapUrl, validLatLng } from "@/lib/geo";
 import { assignTechniciansToCustomer, setAssignmentScope, setPrimaryTechnician, unassign } from "../actions";
 import { createSite } from "../../sites/actions";
 import { setCustomerSchedule } from "../../devices/actions";
@@ -124,8 +124,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     {(s.contact_name || s.contact_phone) && <p className="text-xs text-slate-500">{s.contact_name ?? ""} {s.contact_phone && <a href={`tel:${s.contact_phone}`} dir="ltr" className="underline">{s.contact_phone}</a>}</p>}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {p ? <a href={directionsUrl(p)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>الاتجاهات</a>
+                    {p ? <><a href={mapUrl(p)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>📍 الموقع</a><a href={directionsUrl(p)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>الاتجاهات</a></>
                       : <span className="text-[11px] text-amber-700">بلا موقع على الخريطة</span>}
+                    {ctx.can("sites.update") && !s.archived_at && <Link href={`/sites/${s.id}/edit`} className={`${btnSecondary} ${btnSm}`}>تعديل الفرع والموقع</Link>}
                     {canSurvey && !s.archived_at && <Link href={`/visits/new?type=survey&customer=${id}&site=${s.id}`} className={`${btnSecondary} ${btnSm}`}>معاينة</Link>}
                   </div>
                 </li>

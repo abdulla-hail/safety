@@ -4,6 +4,7 @@ import { PrintDocument } from "@/components/print/PrintDocument";
 import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { loadBranding } from "@/lib/branding";
+import { signedUrls } from "@/lib/storage";
 import { hasInspections, hasWorkOrderExecution } from "@/lib/schema";
 import { PHOTO_STAGES } from "@/components/attachments/UploadForm";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -42,7 +43,8 @@ export default async function PrintVisit({ params }: { params: Promise<{ id: str
   type Ph = { id: string; storage_path: string; file_name: string; mime_type: string | null; photo_stage: string | null; device: { name: string } | null };
   const photoRows = (files.data ?? []) as unknown as Ph[];
   // الصور يحمّلها المتصفح عبر /files/[id] (توقيع عند الطلب) فلا تنتظر الصفحة جولة توقيع
-  const photos = photoRows.map((p) => ({ ...p, url: `/files/${p.id}` as string | null }));
+  const signed = await signedUrls(supabase, "org-files", photoRows.filter((p) => p.mime_type?.startsWith("image/")).map((p) => p.storage_path));
+  const photos = photoRows.map((p) => ({ ...p, url: (signed.get(p.storage_path) ?? `/files/${p.id}`) as string | null }));
   const t = ((techs.data ?? []) as unknown as { technician: { full_name: string; ref_no: string } | null }[]).map((x) => x.technician).filter(Boolean);
   const recs = records.data ?? [];
   const recRef = new Map(recs.map((r) => [r.id, r.ref_no]));
@@ -60,7 +62,7 @@ export default async function PrintVisit({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <PrintToolbar />
+      <PrintToolbar photos={photos.length > 0} />
       <PrintDocument b={b} title={urgent ? "تقرير زيارة طارئة" : "تقرير زيارة صيانة دورية"} refNo={v.ref_no} meta={[
           ["العميل", v.customer && `${v.customer.name} (${v.customer.ref_no})`], ["الموقع", v.site && [v.site.name, v.site.city].filter(Boolean).join(" — ")],
           ["نوع الزيارة", visitType[v.visit_type] ?? null], ["سبب الزيارة", urgent && v.urgent_reason ? URGENT_REASONS[v.urgent_reason] : null],
@@ -125,20 +127,20 @@ export default async function PrintVisit({ params }: { params: Promise<{ id: str
           </>
         )}
         {photos.length > 0 && (
-          <>
+          <section className="doc-photos">
             <h2>الصور والمرفقات ({photos.length})</h2>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="photo-grid">
               {photos.map((p) => (
-                <figure key={p.id} className="break-inside-avoid text-center text-[9px]">
+                <figure key={p.id}>
                   {p.url && p.mime_type?.startsWith("image/")
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={p.url} alt={p.file_name} className="h-24 w-full rounded border border-slate-300 object-cover" />
-                    : <div className="flex h-24 items-center justify-center rounded border border-slate-300">{p.mime_type === "application/pdf" ? "ملف PDF" : "غير متاح"}</div>}
+                    ? <img src={p.url} alt={p.file_name} decoding="sync" />
+                    : <div className="flex h-20 items-center justify-center text-[10px]">{p.mime_type === "application/pdf" ? "ملف PDF مرفق" : "غير متاح"}</div>}
                   <figcaption>{PHOTO_STAGES[p.photo_stage ?? "general"] ?? ""}{p.device ? ` · ${p.device.name}` : ""}</figcaption>
                 </figure>
               ))}
             </div>
-          </>
+          </section>
         )}
         {useItems && !urgent && recs.some((r) => r.next_due_at) && (
           <>

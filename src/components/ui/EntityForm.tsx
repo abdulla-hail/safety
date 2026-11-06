@@ -7,7 +7,7 @@ import { initialActionState, type ActionState } from "@/lib/action-state";
 
 export type FieldType =
   | "text" | "email" | "tel" | "textarea" | "select" | "date" | "datetime-local"
-  | "number" | "checkbox" | "checkboxes" | "color" | "hidden" | "url";
+  | "number" | "checkbox" | "checkboxes" | "color" | "hidden" | "url" | "password";
 
 export interface FieldDef {
   name: string;

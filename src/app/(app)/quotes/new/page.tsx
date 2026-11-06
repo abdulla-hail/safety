@@ -12,7 +12,7 @@ export const metadata = { title: "عرض سعر جديد | عين السلامة
 
 /** عرض سعر يدوي (دون معاينة). الأسرع عادةً: أنهِ المعاينة ثم «تحويل إلى عرض سعر» لتنتقل البنود والأسعار تلقائيًا. */
 export default async function NewQuotePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const ctx = await requireOrg("quotes.manage");
+  const ctx = await requireOrg("quotes.manage", "quotes.create");
   const sp = await searchParams;
   const customerId = param(sp, "customer");
   const supabase = await createClient();

@@ -1,10 +1,25 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import ShareToolbar from "./ShareToolbar";
 import { QuoteDoc, SurveyDoc, type QuoteDocData, type SurveyDocData } from "@/components/print/Docs";
 import { createClient } from "@/lib/supabase/server";
 import type { Branding } from "@/lib/branding";
 
-export const metadata: Metadata = { title: "مستند مشترك | عين السلامة", robots: { index: false, follow: false } };
+// طلب واحد للمستند يتشاركه العنوان والصفحة
+const load = cache(async (token: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("shared_document", { p_token: token });
+  return { s: (data ?? { status: "invalid" }) as Shared, error, supabase };
+});
+
+// العنوان من هوية الشركة المرسلة (لا اسم المنصة) — انظر generateMetadata
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  const { s } = await load(token);
+  const name = s.company?.name ?? "";
+  const doc = s.kind === "quote" ? "عرض سعر" : "تقرير معاينة";
+  return { title: s.status === "ok" ? `${doc} ${String(s.doc?.ref_no ?? "")} — ${name}` : "مستند", robots: { index: false, follow: false } };
+}
 
 type Company = { name: string; legal_name: string | null; phone: string | null; email: string | null; website: string | null; city: string | null; address: string | null;
   vat_number: string | null; commercial_registration: string | null; license_no: string | null; logo_path: string | null; primary_color: string | null;
@@ -24,9 +39,7 @@ const MESSAGES: Record<string, string> = {
  */
 export default async function SharedPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("shared_document", { p_token: token });
-  const s = (data ?? { status: "invalid" }) as Shared;
+  const { s, error, supabase } = await load(token);
   if (error || s.status !== "ok" || !s.company || !s.doc) {
     return (
       <main className="mx-auto max-w-lg p-8 pt-24 text-center" dir="rtl">
@@ -55,7 +68,7 @@ export default async function SharedPage({ params }: { params: Promise<{ token: 
 
   return (
     <>
-      <ShareToolbar title={title} company={c.name} expires={s.expires_at ?? null} phone={c.phone} />
+      <ShareToolbar title={title} company={c.name} expires={s.expires_at ?? null} phone={c.phone} photos={paths.length > 0} />
       {s.kind === "quote"
         ? <QuoteDoc b={b} d={{ ...(doc as unknown as QuoteDocData), vat_rate: Number(doc.vat_rate ?? 0) }} />
         : <SurveyDoc b={b} d={{

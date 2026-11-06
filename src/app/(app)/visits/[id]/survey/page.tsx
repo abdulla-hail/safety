@@ -6,6 +6,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import EntityForm from "@/components/ui/EntityForm";
 import Flash from "@/components/ui/Flash";
 import UploadForm from "@/components/attachments/UploadForm";
+import SafeImage from "@/components/attachments/SafeImage";
 import ShareBox from "@/components/share/ShareBox";
 import { SurveyItems } from "@/components/pricing/SurveyItems";
 import { btnDangerOutline, btnPrimary, btnSecondary, btnSm, card, cardHeader, cardTitle, link } from "@/components/ui/styles";
@@ -17,6 +18,7 @@ import { formatDate, formatDateTime, isFuture } from "@/lib/format";
 import { quoteStatus, surveyIssue, visitStatus } from "@/lib/labels";
 import { directionsUrl } from "@/lib/geo";
 import { sar, totals } from "@/lib/money";
+import { brandNames } from "@/lib/brands";
 import VisitReport from "../run/VisitReport";
 import { completeSurvey, reopenSurvey, setSurveyVat, startSurvey } from "../../survey-actions";
 import { createQuoteFromVisit, revokeShareLink } from "../../../quotes/actions";
@@ -41,16 +43,17 @@ export default async function SurveyPage({ params }: { params: Promise<{ id: str
   const ctx = await requireOrg("visits.view", "visits.create", "field.assigned");
   if (!isUuid(id)) notFound();
   const supabase = await createClient();
-  const canQuote = ctx.can("quotes.manage");
-  const [{ data: raw }, techs, items, files, quotes, links] = await Promise.all([
+  const canQuote = ctx.canAny("quotes.manage", "quotes.create");
+  const [{ data: raw }, techs, items, files, quotes, links, brands] = await Promise.all([
     supabase.from("visits").select("id, ref_no, visit_type, status, closed_at, scheduled_start, actual_start, actual_end, notes, summary, recommendations, technician_notes, survey_vat, updated_at, "
       + "customer:customers(id, name, email, phone), site:customer_sites(id, name, city, address, contact_name, contact_phone, latitude, longitude, devices(id, name, ref_no, archived_at))")
       .eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
     supabase.from("visit_technicians").select("technician:technicians(full_name, phone)").eq("company_id", ctx.orgId).eq("visit_id", id),
-    supabase.from("survey_items").select("id, title, issue_type, description, quantity, unit_price, device_id, sort_order").eq("company_id", ctx.orgId).eq("visit_id", id).order("sort_order").order("created_at"),
+    supabase.from("survey_items").select("id, title, issue_type, description, quantity, unit_price, device_id, brand, sort_order").eq("company_id", ctx.orgId).eq("visit_id", id).order("sort_order").order("created_at"),
     supabase.from("attachments").select("id, file_name, mime_type, survey_item_id, photo_stage, created_by, created_at").eq("company_id", ctx.orgId).eq("entity_type", "visit").eq("entity_id", id).order("created_at"),
-    ctx.canAny("quotes.view", "quotes.manage") ? supabase.from("quotations").select("id, ref_no, status").eq("company_id", ctx.orgId).eq("visit_id", id).is("archived_at", null) : null,
+    ctx.canAny("quotes.view", "quotes.manage", "quotes.create") ? supabase.from("quotations").select("id, ref_no, status").eq("company_id", ctx.orgId).eq("visit_id", id).is("archived_at", null) : null,
     supabase.from("share_links").select("id, created_at, expires_at, revoked_at").eq("company_id", ctx.orgId).eq("kind", "survey").eq("entity_id", id).order("created_at", { ascending: false }).limit(10),
+    brandNames(supabase, ctx.orgId),
   ]);
   const v = raw as unknown as V | null;
   if (!v) notFound();
@@ -59,7 +62,7 @@ export default async function SurveyPage({ params }: { params: Promise<{ id: str
   const closed = !!v.closed_at;
   const cancelled = v.status === "cancelled";
   const canWork = ctx.can("visits.update") && !closed && !cancelled;
-  const lines = (items.data ?? []) as { id: string; title: string; issue_type: string; description: string | null; quantity: number; unit_price: number; device_id: string | null }[];
+  const lines = (items.data ?? []) as { id: string; title: string; issue_type: string; description: string | null; quantity: number; unit_price: number; device_id: string | null; brand: string | null }[];
   const vatRate = v.survey_vat ? 15 : 0;
   const t = totals(lines, vatRate);
   const devices = (v.site?.devices ?? []).filter((d) => !d.archived_at).map((d) => ({ value: d.id, label: `${d.name} (${d.ref_no})` }));
@@ -110,7 +113,7 @@ export default async function SurveyPage({ params }: { params: Promise<{ id: str
           ) : <span className="text-xs text-slate-500">{v.survey_vat ? "يشمل ضريبة القيمة المضافة 15٪" : "بدون ضريبة"}</span>}
         </div>
         <div className="p-4">
-          <SurveyItems visitId={id} lines={lines} devices={devices} vatRate={vatRate} locked={!canWork} />
+          <SurveyItems visitId={id} lines={lines} devices={devices} vatRate={vatRate} locked={!canWork} brands={brands} canAddBrand={ctx.canAny("catalog.manage", "quotes.manage")} />
         </div>
       </section>
 
@@ -121,8 +124,7 @@ export default async function SurveyPage({ params }: { params: Promise<{ id: str
             {photos.map((p) => (
               <li key={p.id} className="w-28 overflow-hidden rounded-lg border border-slate-200 bg-white text-[10px] text-slate-600">
                 {p.mime_type?.startsWith("image/")
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <a href={`/files/${p.id}`} target="_blank" rel="noopener noreferrer"><img src={`/files/${p.id}`} alt={p.file_name} loading="lazy" className="h-20 w-full object-cover" /></a>
+                  ? <a href={`/files/${p.id}`} target="_blank" rel="noopener noreferrer"><SafeImage src={`/files/${p.id}`} alt={p.file_name} className="h-20 w-full object-cover" /></a>
                   : <a href={`/files/${p.id}`} target="_blank" rel="noopener noreferrer" className="flex h-20 items-center justify-center bg-slate-50 font-bold">PDF</a>}
                 <div className="space-y-0.5 p-1">
                   <p className="truncate font-semibold">{p.survey_item_id ? itemName.get(p.survey_item_id) ?? "بند" : "عامة"}</p>

@@ -178,6 +178,12 @@ form[aria-busy="true"] fieldset, form[aria-busy="true"] .busy-dim { opacity: 0.7
 .print-doc .doc-body thead th { border-bottom-width: 2px; }
 .print-doc .doc-body tr, .print-doc .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
 .print-doc h2 { font-size: 13px; font-weight: 800; margin: 14px 0 6px; break-after: avoid; page-break-after: avoid; }
+/* صور التقرير: شبكة بحجم موحد، الصورة كاملة دون قص ولا تنقسم بين صفحتين ولا تتجاوز حدود الصفحة */
+.print-doc .doc-photos .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.print-doc .doc-photos figure { break-inside: avoid; page-break-inside: avoid; margin: 0; border: 1px solid #94a3b8; border-radius: 4px; padding: 3px; text-align: center; }
+.print-doc .doc-photos img { display: block; width: 100%; height: 5.2cm; object-fit: contain; background: #f8fafc; }
+.print-doc .doc-photos figcaption { font-size: 9px; color: #334155; margin-top: 2px; overflow-wrap: anywhere; }
+.print-hide-photos .print-doc .doc-photos { display: none !important; }
 .print-doc .doc-card { border: 1px solid #64748b; border-radius: 4px; padding: 8px; break-inside: avoid; page-break-inside: avoid; }
 
 @media print {

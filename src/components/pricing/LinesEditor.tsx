@@ -6,7 +6,7 @@ import { btnDangerOutline, btnPrimary, btnSecondary, btnSm, input, label as labe
 import { lineTotal, sar, totals } from "@/lib/money";
 
 export interface Line { id: string; [k: string]: string | number | null }
-export interface LineField { name: string; label: string; type?: "text" | "textarea" | "select" | "number"; options?: { value: string; label: string }[]; required?: boolean; wide?: boolean; placeholder?: string }
+export interface LineField { name: string; label: string; type?: "text" | "textarea" | "select" | "number" | "combo"; options?: { value: string; label: string }[]; required?: boolean; wide?: boolean; placeholder?: string }
 type SaveResult = { ok: boolean; message: string; errors?: Record<string, string> };
 
 /**
@@ -72,6 +72,11 @@ export default function LinesEditor({ lines, fields, vatRate, locked, onSave, on
                     {!f.required && <option value="">—</option>}
                     {f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>)
+                : f.type === "combo" ? (<>
+                  <input id={id} list={`${id}-list`} value={values[f.name] ?? ""} placeholder={f.placeholder} autoComplete="off"
+                    onChange={(e) => set(f.name, e.target.value)} className={input} />
+                  <datalist id={`${id}-list`}>{f.options?.map((o) => <option key={o.value} value={o.value} />)}</datalist>
+                </>)
                 : <input id={id} inputMode={f.type === "number" ? "decimal" : undefined} value={values[f.name] ?? ""} placeholder={f.placeholder}
                     dir={f.type === "number" ? "ltr" : undefined} onChange={(e) => set(f.name, e.target.value)} className={input} />}
               {err && <p className="mt-1 text-xs text-red-700">{err}</p>}

@@ -4,6 +4,7 @@ import { SurveyDoc, type SurveyDocData } from "@/components/print/Docs";
 import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { loadBranding } from "@/lib/branding";
+import { signedUrls } from "@/lib/storage";
 import { isUuid } from "@/lib/list";
 
 export const metadata = { title: "تقرير معاينة | طباعة" };
@@ -19,18 +20,20 @@ export default async function PrintSurvey({ params }: { params: Promise<{ id: st
       .eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
     loadBranding(supabase, ctx.orgId),
     supabase.from("visit_technicians").select("technician:technicians(full_name)").eq("visit_id", id),
-    supabase.from("survey_items").select("id, title, issue_type, description, quantity, unit_price, device:devices(name, ref_no)").eq("visit_id", id).order("sort_order").order("created_at"),
-    supabase.from("attachments").select("id, file_name, mime_type, survey_item_id").eq("entity_type", "visit").eq("entity_id", id).is("archived_at", null).order("created_at"),
+    supabase.from("survey_items").select("id, title, issue_type, description, quantity, unit_price, brand, device:devices(name, ref_no)").eq("visit_id", id).order("sort_order").order("created_at"),
+    supabase.from("attachments").select("id, storage_path, file_name, mime_type, survey_item_id").eq("entity_type", "visit").eq("entity_id", id).is("archived_at", null).order("created_at"),
   ]);
   if (!v || !b || v.visit_type !== "survey") notFound();
-  type It = { id: string; title: string; issue_type: string; description: string | null; quantity: number; unit_price: number; device: { name: string; ref_no: string } | null };
+  type It = { id: string; title: string; issue_type: string; description: string | null; quantity: number; unit_price: number; brand: string | null; device: { name: string; ref_no: string } | null };
+  // روابط موقعة دفعة واحدة: الصور تُحمَّل مباشرة وتظهر كاملة عند الطباعة وحفظ PDF
+  const signed = await signedUrls(supabase, "org-files", (files.data ?? []).filter((f) => f.mime_type?.startsWith("image/")).map((f) => f.storage_path));
   const d: SurveyDocData = {
     ref_no: v.ref_no, scheduled_start: v.scheduled_start, actual_end: v.actual_end, summary: v.summary, recommendations: v.recommendations,
     technician_notes: v.technician_notes, vat_rate: v.survey_vat ? 15 : 0, draft: !v.closed_at,
     customer: v.customer as unknown as SurveyDocData["customer"], site: v.site as unknown as SurveyDocData["site"],
     technicians: ((techs.data ?? []) as unknown as { technician: { full_name: string } | null }[]).map((t) => t.technician?.full_name ?? "").filter(Boolean),
     items: ((items.data ?? []) as unknown as It[]).map((i) => ({ ...i, device: i.device?.name ?? null, device_ref: i.device?.ref_no ?? null })),
-    photos: (files.data ?? []).map((f) => ({ url: `/files/${f.id}`, name: f.file_name, mime: f.mime_type, item_id: f.survey_item_id })),
+    photos: (files.data ?? []).map((f) => ({ url: signed.get(f.storage_path) ?? `/files/${f.id}`, name: f.file_name, mime: f.mime_type, item_id: f.survey_item_id })),
   };
-  return (<><PrintToolbar note="لحفظ PDF: اختر «حفظ كـ PDF» في نافذة الطباعة." /><SurveyDoc b={b} d={d} /></>);
+  return (<><PrintToolbar photos={d.photos.length > 0} note="لحفظ PDF: اختر «حفظ كـ PDF» في نافذة الطباعة." /><SurveyDoc b={b} d={d} /></>);
 }

@@ -9,6 +9,7 @@ import { isUuid } from "@/lib/list";
 import { fromLocalInput } from "@/lib/format";
 import { parseAmount } from "@/lib/money";
 import { surveyIssue } from "@/lib/labels";
+import { resolveBrand } from "@/lib/brands";
 import { fail, str, strOrNull, type ActionState } from "@/lib/action-state";
 
 /** إنشاء زيارة معاينة لفرع وإسنادها لفني؛ القاعدة تتحقق من النطاق (الفني لفروع نطاقه ولنفسه) وتمنع التكرار بمفتاح العميل */
@@ -49,11 +50,14 @@ export async function saveSurveyItem(input: { visitId: string; id?: string; fiel
   if (price === null) errors.unit_price = "سعر غير صالح";
   if (Object.keys(errors).length) return { ok: false, message: "راجع الحقول المعلَّمة؛ لم يُحفظ شيء.", errors };
   const device = g("device_id");
+  const supabase = await createClient();
+  const brand = await resolveBrand(supabase, ctx.orgId, g("brand"), ctx.canAny("catalog.manage", "quotes.manage"));
+  if (!brand.ok) return { ok: false, message: brand.message, errors: { brand: "اختر من القائمة" } };
   const row = {
+    brand_id: brand.id, brand: brand.name,
     title: title.slice(0, 200), issue_type: issue, description: g("description").slice(0, 2000) || null,
     quantity: qty, unit_price: price, device_id: isUuid(device) ? device : null,
   };
-  const supabase = await createClient();
   const res = input.id && isUuid(input.id)
     ? await supabase.from("survey_items").update(row).eq("id", input.id).eq("visit_id", input.visitId).select("id")
     : await supabase.from("survey_items").insert({ ...row, company_id: ctx.orgId, visit_id: input.visitId, sort_order: Date.now() % 2_000_000_000 }).select("id");
