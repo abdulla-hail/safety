@@ -51,31 +51,6 @@ export async function transitionFault(prev: ActionState, fd: FormData): Promise<
   return { ok: true, message: "تم تحديث البلاغ وحُفظ في سجله.", attempt: (prev.attempt ?? 0) + 1 };
 }
 
-/** أمر عمل مستقل لإصلاح البلاغ (دون إنشاء زيارة تلقائيًا)، ثم ربطه بالبلاغ */
-export async function createWorkOrderForFault(prev: ActionState, fd: FormData): Promise<ActionState> {
-  const ctx = await orgForAction("work_orders.create");
-  const id = str(fd, "fault_id");
-  if (!ctx || !isUuid(id)) return fail(prev, fd, "ليست لديك صلاحية إنشاء أوامر العمل.");
-  const supabase = await createClient();
-  const { data: f, error: e0 } = await supabase.from("device_faults").select("id, ref_no, device_id, customer_id, site_id, description, severity, status")
-    .eq("id", id).eq("company_id", ctx.orgId).maybeSingle();
-  if (e0 || !f) return fail(prev, fd, "البلاغ غير موجود.");
-  const priority = f.severity === "critical" ? "critical" : f.severity === "high" ? "high" : f.severity === "low" ? "low" : "medium";
-  const { data: wo, error } = await supabase.from("work_orders").insert({
-    company_id: ctx.orgId, customer_id: f.customer_id, site_id: f.site_id, order_type: f.severity === "critical" ? "emergency" : "corrective",
-    priority, title: `إصلاح عطل ${f.ref_no ?? ""}`.trim(), description: f.description, status: "new",
-  }).select("id").single();
-  if (error) return fail(prev, fd, dbErrorMessage(error));
-  const { error: e2 } = await supabase.from("work_order_devices").insert({ work_order_id: wo.id, device_id: f.device_id, company_id: ctx.orgId });
-  if (e2) return { ok: false, message: `أُنشئ أمر العمل لكن تعذر ربط الجهاز: ${dbErrorMessage(e2)}`, attempt: (prev.attempt ?? 0) + 1 };
-  const { error: e3 } = await supabase.rpc("fault_transition", {
-    p_fault: id, p_status: f.status === "open" ? "in_progress" : f.status, p_note: "أُنشئ أمر عمل للإصلاح",
-    p_work_order: wo.id, p_verification: null, p_device_status: null,
-  });
-  if (e3) return { ok: false, message: `أُنشئ أمر العمل لكن تعذر ربطه بالبلاغ: ${dbErrorMessage(e3)}`, attempt: (prev.attempt ?? 0) + 1 };
-  revalidatePath(`/faults/${id}`);
-  redirect(`/work-orders/${wo.id}?ok=created`);
-}
 
 /** تعديل مسؤول المتابعة وتاريخها (تحديث مباشر مسموح بأعمدته فقط؛ التدقيق يحفظ القديم والجديد) */
 export async function updateFaultFollowUp(prev: ActionState, fd: FormData): Promise<ActionState> {

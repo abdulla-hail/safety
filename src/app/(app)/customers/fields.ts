@@ -16,11 +16,11 @@ export const customerFields: FieldDef[] = [
 ];
 
 export const siteFields: FieldDef[] = [
-  { name: "name", label: "اسم الموقع / الفرع", required: true, wide: true },
+  { name: "name", label: "اسم الفرع / الموقع", required: true, wide: true },
   { name: "city", label: "المدينة" },
   { name: "district", label: "الحي" },
   { name: "address", label: "العنوان", wide: true },
-  { name: "contact_name", label: "مسؤول الموقع" },
-  { name: "contact_phone", label: "هاتف المسؤول", type: "tel", dir: "ltr" },
+  { name: "contact_name", label: "مسؤول الفرع" },
+  { name: "contact_phone", label: "هاتف التواصل", type: "tel", dir: "ltr" },
   { name: "notes", label: "ملاحظات", type: "textarea" },
 ];

@@ -71,3 +71,13 @@ export function dueStatus(next: string | null | undefined, alertDays = 14): "non
   if (d === null) return "none";
   return d < 0 ? "overdue" : d === 0 ? "due" : d <= alertDays ? "due_soon" : "upcoming";
 }
+
+/** الآن كسلسلة ISO (خارج مكوّن العرض حتى تبقى المكوّنات نقية) */
+export function nowISO(): string {
+  return new Date().toISOString();
+}
+
+/** هل التاريخ في المستقبل؟ (صلاحية الروابط وما شابه) */
+export function isFuture(value: string | null | undefined): boolean {
+  return !!value && new Date(value).getTime() > Date.now();
+}

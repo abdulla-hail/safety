@@ -17,7 +17,9 @@ interface Pick { key: string; file: File; url: string | null; status: "ready" | 
  * رفع ملف أو عدة ملفات (من الجهاز أو كاميرا الجوال): معاينة مصغرة قبل الحفظ مع إزالة أي ملف، ثم كل ملف في طلب مستقل
  * (يبقى ضمن حد حجم الاستضافة) وتُعرض نتيجة كل ملف؛ فشل ملف لا يلغي ما نجح، ويمكن إعادة المحاولة للفاشل. لا تُستبدل أي صورة سابقة.
  */
-export default function UploadForm({ entityType, entityId, devices, fixedDeviceId, stages = ["general", "before", "after"] }: {
+export default function UploadForm({ entityType, entityId, devices, fixedDeviceId, surveyItems, stages = ["general", "before", "after"] }: {
+  /** لصور المعاينة: ربط الصورة ببند من بنود المعاينة (اختياري) */
+  surveyItems?: { id: string; name: string }[];
   entityType: string; entityId: string;
   /** لصور الزيارة: ربط الصورة بجهاز من أجهزة الزيارة (اختياري؛ الصورة العامة تُحفظ بلا جهاز) */
   devices?: { id: string; name: string }[];
@@ -28,6 +30,7 @@ export default function UploadForm({ entityType, entityId, devices, fixedDeviceI
   const [picks, setPicks] = useState<Pick[]>([]);
   const [stage, setStage] = useState(fixedDeviceId ? "before" : "general");
   const [chosenDevice, setDeviceId] = useState("");
+  const [itemId, setItemId] = useState("");
   const [busy, setBusy] = useState(false);
   const [inputKey, setInputKey] = useState(0);
   const router = useRouter();
@@ -61,6 +64,7 @@ export default function UploadForm({ entityType, entityId, devices, fixedDeviceI
       const fd = new FormData();
       fd.set("entity_type", entityType); fd.set("entity_id", entityId); fd.set("file", p.file);
       if (devices || fixedDeviceId) { fd.set("photo_stage", stage); if (deviceId) fd.set("device_id", deviceId); }
+      if (surveyItems) { fd.set("photo_stage", stage); if (itemId) fd.set("survey_item_id", itemId); }
       let ok = false, message = "";
       try {
         const r = await uploadAttachment(initialActionState, fd);
@@ -83,7 +87,7 @@ export default function UploadForm({ entityType, entityId, devices, fixedDeviceI
         <label htmlFor={id} className={`${btnSecondary} ${btnSm} cursor-pointer`}>اختيار صور أو ملفات</label>
         <input key={inputKey} id={id} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf" className="sr-only"
           onChange={(e) => add(e.target.files)} />
-        {(devices || fixedDeviceId) && (
+        {(devices || fixedDeviceId || surveyItems) && (
           <select aria-label="تصنيف الصورة" value={stage} onChange={(e) => setStage(e.target.value)} className={`${input} !w-auto text-sm`}>
             {stages.map((s) => <option key={s} value={s}>{PHOTO_STAGES[s] ?? s}</option>)}
           </select>
@@ -92,6 +96,12 @@ export default function UploadForm({ entityType, entityId, devices, fixedDeviceI
           <select aria-label="الجهاز المرتبط" value={chosenDevice} onChange={(e) => setDeviceId(e.target.value)} className={`${input} !w-auto text-sm`}>
             <option value="">بلا جهاز (عامة للزيارة)</option>
             {devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        )}
+        {surveyItems && surveyItems.length > 0 && (
+          <select aria-label="البند المرتبط" value={itemId} onChange={(e) => setItemId(e.target.value)} className={`${input} !w-auto max-w-56 text-sm`}>
+            <option value="">بلا بند (صورة عامة)</option>
+            {surveyItems.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         )}
         <button aria-busy={busy} type="submit" disabled={busy || pending.length === 0} className={`${btnSecondary} ${btnSm}`}>

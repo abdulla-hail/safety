@@ -18,7 +18,6 @@ export const metadata = { title: "البلاغات والأعطال | عين ا�
 interface Row {
   id: string; ref_no: string; description: string; severity: string; status: string; reported_at: string; archived_at: string | null;
   device: { id: string; name: string; ref_no: string } | null; customer: { id: string; name: string } | null; site: { name: string } | null;
-  work_order: { id: string; ref_no: string } | null;
 }
 
 const OPEN = ["open", "in_progress", "awaiting_verification"];
@@ -31,7 +30,7 @@ export default async function FaultsPage({ searchParams }: { searchParams: Promi
   const supabase = await createClient();
   if (!(await hasPhase5(supabase))) return <PhasePending />;
   let q = supabase.from("device_faults")
-    .select("id, ref_no, description, severity, status, reported_at, archived_at, device:devices(id, name, ref_no), customer:customers(id, name), site:customer_sites(name), work_order:work_orders(id, ref_no)", { count: "exact" })
+    .select("id, ref_no, description, severity, status, reported_at, archived_at, device:devices(id, name, ref_no), customer:customers(id, name), site:customer_sites(name)", { count: "exact" })
     .eq("company_id", ctx.orgId).is("archived_at", null).order(sort.column, { ascending: sort.ascending }).range(...rangeOf(page));
   const status = param(sp, "status");
   if (status === "active" || !status) q = q.in("status", OPEN);
@@ -51,7 +50,6 @@ export default async function FaultsPage({ searchParams }: { searchParams: Promi
     ) },
     { key: "desc", label: "الوصف", render: (r) => <span className="line-clamp-2 max-w-sm">{r.description}</span> },
     { key: "sev", label: "الخطورة", sortKey: "severity", render: (r) => <StatusBadge {...(faultSeverity[r.severity] ?? { label: r.severity, tone: "neutral" })} /> },
-    { key: "wo", label: "أمر العمل", render: (r) => r.work_order ? <Link href={`/work-orders/${r.work_order.id}`} className={`${link} font-mono text-xs`} dir="ltr">{r.work_order.ref_no}</Link> : "—" },
     { key: "at", label: "تاريخ البلاغ", sortKey: "reported_at", render: (r) => formatDateTime(r.reported_at) },
     { key: "status", label: "الحالة", render: (r) => <StatusBadge {...(faultStatus[r.status] ?? { label: r.status, tone: "neutral" })} /> },
   ];

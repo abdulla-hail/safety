@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import EntityForm from "@/components/ui/EntityForm";
@@ -14,7 +14,7 @@ import { hasInspections, hasWorkOrderExecution } from "@/lib/schema";
 import { logLoadError } from "@/lib/errors";
 import { isUuid } from "@/lib/list";
 import { dueStatus, formatDateTime, todayISO } from "@/lib/format";
-import { deviceStatus, faultSeverity, faultStatus, maintenanceAction, maintenanceResult, toOptions, visitOutcome, visitType, workOrderPriority } from "@/lib/labels";
+import { deviceStatus, faultSeverity, faultStatus, maintenanceAction, maintenanceResult, toOptions, visitOutcome, visitType } from "@/lib/labels";
 import { URGENT_REASONS, closeSummary, computeNextDue, partsText, progressPercent, type Part } from "@/lib/visits";
 import { addVisitDevices, closeVisit, removeVisitDevice, reportVisitFault } from "../../../my-work/actions";
 import { deleteAttachment } from "../../../attachments/actions";
@@ -64,7 +64,7 @@ export default async function RunVisitPage({ params }: { params: Promise<{ id: s
   if (!inspections) {
     return <PhasePending title="تنفيذ الزيارة">تنفيذ الزيارة جهازًا جهازًا جاهز في التطبيق ويتطلب تطبيق ترحيل قاعدة البيانات 20261106000100.</PhasePending>;
   }
-  const visitCols: string = "id, ref_no, visit_type, urgent_reason, status, closed_at, outcome, notes, summary, recommendations, scheduled_start, actual_start, updated_at, work_order_id, company:companies(schedule_policy), customer:customers(id, name), site:customer_sites(id, name, devices(id, name, ref_no, archived_at, status)), work_order:work_orders(id, ref_no, title, priority, order_type)"
+  const visitCols: string = "id, ref_no, visit_type, urgent_reason, status, closed_at, outcome, notes, summary, recommendations, scheduled_start, actual_start, updated_at, work_order_id, company:companies(schedule_policy), customer:customers(id, name), site:customer_sites(id, name, devices(id, name, ref_no, archived_at, status))"
     + (woExec ? ", technician_notes" : "");
   const faultCols: string = "id, ref_no, description, severity, status, reported_at, device:devices(name)" + (woExec ? ", action_taken, recommendation" : "");
   // جولة واحدة متوازية: الزيارة، بنودها مع أجهزتها وبلاغاتها المفتوحة، صورها، بلاغات هذه الزيارة، والفنيون (للمتابعة)
@@ -82,10 +82,10 @@ export default async function RunVisitPage({ params }: { params: Promise<{ id: s
   type V = { id: string; ref_no: string; visit_type: string; urgent_reason: string | null; status: string; closed_at: string | null; outcome: string | null;
     notes: string | null; summary: string | null; recommendations: string | null; technician_notes?: string | null; scheduled_start: string; actual_start: string | null;
     updated_at: string; work_order_id: string | null; company: { schedule_policy?: string } | null; customer: { id: string; name: string } | null;
-    site: { id: string; name: string; devices?: { id: string; name: string; ref_no: string; archived_at: string | null; status: string }[] } | null;
-    work_order: { id: string; ref_no: string; title: string; priority: string; order_type: string } | null };
+    site: { id: string; name: string; devices?: { id: string; name: string; ref_no: string; archived_at: string | null; status: string }[] } | null; };
   const v = raw as unknown as V | null;
   if (!v) notFound();
+  if (v.visit_type === "survey") redirect(`/visits/${id}/survey`);
   if (items.error) {
     return <PhasePending title={`تنفيذ الزيارة ${v.ref_no}`}>تعذر تحميل أجهزة الزيارة حاليًا{logLoadError("run/items", items.error)}. أعد تحميل الصفحة بعد لحظات؛ لم يُفقد ما حُفظ.</PhasePending>;
   }
@@ -147,7 +147,7 @@ export default async function RunVisitPage({ params }: { params: Promise<{ id: s
   const siteDevices = activeSiteDevices.filter((d) => !inVisit.has(d.id));
   const pendingNames = views.filter((x) => x.fields.inspection_status === "pending").map((x) => x.deviceName);
   const urgent = v.visit_type !== "periodic";
-  const kindLabel = v.work_order ? "زيارة أمر عمل" : urgent ? "زيارة طارئة" : "زيارة دورية";
+  const kindLabel = urgent ? "زيارة طارئة" : "زيارة دورية";
   // أجهزة البلاغ: أجهزة الزيارة أولًا ثم بقية أجهزة الموقع (تُضاف للزيارة عند الإبلاغ)
   const faultDevices = [...rows.map((r) => ({ value: r.device_id, label: r.device?.name ?? "—" })),
     ...siteDevices.map((d) => ({ value: d.id, label: `${d.name} (يُضاف للزيارة)` }))];
@@ -159,13 +159,7 @@ export default async function RunVisitPage({ params }: { params: Promise<{ id: s
         description={<>{v.customer?.name} · بدأت {formatDateTime(v.actual_start ?? v.scheduled_start)}{urgent && v.urgent_reason && ` · السبب: ${URGENT_REASONS[v.urgent_reason] ?? v.urgent_reason}`}</>}
         actions={<Link href={`/print/visit/${id}`} className={btnSecondary}>{closed ? "طباعة التقرير" : "معاينة التقرير"}</Link>} />
 
-      {v.work_order && (
-        <section className={`${card} flex flex-wrap items-center justify-between gap-3 p-4 text-sm`}>
-          <div><p className="font-bold">أمر العمل: <Link href={`/work-orders/${v.work_order.id}`} className={link}>{v.work_order.title}</Link> <span className="font-mono text-xs text-slate-500" dir="ltr">{v.work_order.ref_no}</span></p>
-            {v.notes && <p className="mt-1 whitespace-pre-line text-xs text-slate-600">{v.notes}</p>}</div>
-          <StatusBadge {...(workOrderPriority[v.work_order.priority] ?? { label: v.work_order.priority, tone: "neutral" })} />
-        </section>
-      )}
+      {v.notes && <p className={`${card} whitespace-pre-line p-4 text-sm text-slate-600`}>{v.notes}</p>}
 
       <section className={`${card} p-5`} aria-label="تقدم الزيارة">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -268,7 +262,7 @@ export default async function RunVisitPage({ params }: { params: Promise<{ id: s
                   { name: "action_taken", label: "الإجراء المتخذ", type: "textarea", maxLength: 2000 },
                   { name: "recommendation", label: "التوصية", type: "textarea", maxLength: 2000 },
                 ]} />
-              <p className="mt-2 text-xs text-slate-500">يرتبط البلاغ بالزيارة{v.work_order ? " وأمر العمل" : ""} والعميل والموقع والجهاز، ويُشعر المسؤولين. وثّقه بصورة «توثيق عطل» مرتبطة بالجهاز.</p>
+              <p className="mt-2 text-xs text-slate-500">يرتبط البلاغ بالزيارة والعميل والموقع والجهاز، ويُشعر المسؤولين. وثّقه بصورة «توثيق عطل» مرتبطة بالجهاز.</p>
             </div>
           </details>
         )}
@@ -310,7 +304,7 @@ export default async function RunVisitPage({ params }: { params: Promise<{ id: s
             ) : sum.total === 0 ? (
               <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">أضف الأجهزة المعنية وسجّل نتائجها قبل الإغلاق.</p>
             ) : (
-              <p className="rounded-lg bg-green-50 p-3 text-green-800">كل الأجهزة لها نتيجة. عند الإغلاق تُنشأ سجلات الصيانة للأجهزة المفحوصة فقط{v.work_order ? " ويكتمل أمر العمل" : ""}، ويصدر تقرير موحد للزيارة. احفظ التقرير والملاحظات قبل الإغلاق.</p>
+              <p className="rounded-lg bg-green-50 p-3 text-green-800">كل الأجهزة لها نتيجة. عند الإغلاق تُنشأ سجلات الصيانة للأجهزة المفحوصة فقط، ويصدر تقرير موحد للزيارة. احفظ التقرير والملاحظات قبل الإغلاق.</p>
             )}
             {sum.total > 0 && (sum.pending === 0 || ctx.can("visits.close_exception")) && (
               <EntityForm action={closeVisit} submitLabel={sum.pending ? "إغلاق باستثناء موثق" : "إغلاق الزيارة وإصدار التقرير"} initial={{ visit_id: id }}

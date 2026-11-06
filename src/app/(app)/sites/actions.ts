@@ -7,6 +7,15 @@ import { createClient } from "@/lib/supabase/server";
 import { dbErrorMessage } from "@/lib/errors";
 import { isUuid } from "@/lib/list";
 import { fail, str, strOrNull, type ActionState } from "@/lib/action-state";
+import { validLatLng } from "@/lib/geo";
+
+/** الموقع على الخريطة: الحقلان معًا أو فارغان (القاعدة تتحقق أيضًا) */
+function location(fd: FormData): { latitude: number | null; longitude: number | null } | "invalid" {
+  const lat = str(fd, "latitude"), lng = str(fd, "longitude");
+  if (!lat && !lng) return { latitude: null, longitude: null };
+  const p = validLatLng(lat, lng);
+  return p ? { latitude: p.lat, longitude: p.lng } : "invalid";
+}
 
 function payload(fd: FormData) {
   return {
@@ -25,10 +34,12 @@ export async function createSite(prev: ActionState, fd: FormData): Promise<Actio
   const customerId = str(fd, "customer_id");
   if (!ctx) return fail(prev, fd, "ليست لديك صلاحية إضافة المواقع.");
   if (!isUuid(customerId)) return fail(prev, fd, "اختر العميل.", { customer_id: "مطلوب" });
-  if (str(fd, "name").length < 2) return fail(prev, fd, "اسم الموقع مطلوب.", { name: "مطلوب" });
+  if (str(fd, "name").length < 2) return fail(prev, fd, "اسم الفرع مطلوب.", { name: "مطلوب" });
+  const loc = location(fd);
+  if (loc === "invalid") return fail(prev, fd, "موقع الخريطة غير صالح؛ حدده من جديد.");
   const supabase = await createClient();
   const { data, error } = await supabase.from("customer_sites")
-    .insert({ ...payload(fd), customer_id: customerId, company_id: ctx.orgId }).select("id").single();
+    .insert({ ...payload(fd), ...loc, customer_id: customerId, company_id: ctx.orgId }).select("id").single();
   if (error) return fail(prev, fd, dbErrorMessage(error));
   revalidatePath(`/customers/${customerId}`);
   redirect(`/sites/${data.id}?ok=created`);
@@ -38,9 +49,11 @@ export async function updateSite(prev: ActionState, fd: FormData): Promise<Actio
   const ctx = await orgForAction("sites.update");
   const id = str(fd, "id");
   if (!ctx || !isUuid(id)) return fail(prev, fd, "ليست لديك صلاحية تعديل المواقع.");
-  if (str(fd, "name").length < 2) return fail(prev, fd, "اسم الموقع مطلوب.", { name: "مطلوب" });
+  if (str(fd, "name").length < 2) return fail(prev, fd, "اسم الفرع مطلوب.", { name: "مطلوب" });
+  const loc = location(fd);
+  if (loc === "invalid") return fail(prev, fd, "موقع الخريطة غير صالح؛ حدده من جديد.");
   const supabase = await createClient();
-  const { data, error } = await supabase.from("customer_sites").update(payload(fd)).eq("id", id).eq("company_id", ctx.orgId).select("id");
+  const { data, error } = await supabase.from("customer_sites").update({ ...payload(fd), ...loc }).eq("id", id).eq("company_id", ctx.orgId).select("id");
   if (error) return fail(prev, fd, dbErrorMessage(error));
   if (!data?.length) return fail(prev, fd, "الموقع غير موجود أو لا تملك صلاحية تعديله.");
   redirect(`/sites/${id}?ok=saved`);

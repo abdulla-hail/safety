@@ -36,27 +36,24 @@ async function AppFrame({ children }: { children: ReactNode }) {
   const items: NavItem[] = [];
   if (m) {
     items.push({ label: "لوحة التحكم", icon: "dashboard", href: "/dashboard" });
-    // «عملي» القسم الرئيسي للعمل الميداني (الزيارات الدورية والطارئة والمسودات والبلاغات والمتابعات والسجل)؛
-    // للفني الميداني لا تتكرر الزيارات والصيانة والبلاغات وأوامر العمل كأقسام مستقلة لأنها داخل «عملي» (الروابط المباشرة تبقى تعمل)
-    if (field || any("visits.create")) items.push({ label: "عملي", icon: "clock", href: "/my-work" });
-    const fieldOnly = field && !any("visits.view", "maintenance.view", "work_orders.view", "faults.view");
-    if (any("customers.view") || field) items.push({ label: "العملاء", icon: "building", href: "/customers", section: "العمليات" });
-    if (any("sites.view") || field) items.push({ label: "المواقع والفروع", icon: "mapPin", href: "/sites", section: "العمليات" });
-    if (any("devices.view") || field) items.push({ label: "الأجهزة", icon: "shield", href: "/devices", section: "العمليات" });
-    if (!fieldOnly && any("work_orders.view", "work_orders.create")) items.push({ label: "أوامر العمل", icon: "clipboard", href: "/work-orders", section: "العمليات" });
-    if (!fieldOnly && any("visits.view", "visits.create")) items.push({ label: "الزيارات", icon: "calendar", href: "/visits", section: "العمليات" });
-    if (!fieldOnly && any("maintenance.view")) items.push({ label: "سجلات الصيانة", icon: "wrench", href: "/maintenance", section: "العمليات" });
-    if (phase5 && !fieldOnly && any("faults.view", "faults.create", "faults.update")) items.push({ label: "البلاغات والأعطال", icon: "shieldAlert", href: "/faults", section: "العمليات" });
-    // الفنيون يُضافون ويُدارون من «فريق الشركة والدعوات»؛ يبقى الإسناد التشغيلي هنا
-    if (any("assignments.manage")) items.push({ label: "إسناد الفنيين", icon: "link", href: "/assignments", section: "الفريق" });
-    if (any("catalog.view", "catalog.manage")) items.push({ label: "كتالوج أجهزة السلامة", icon: "book", href: "/catalog", section: "الفريق" });
-    if (any("reports.view")) items.push({ label: "التقارير", icon: "chart", href: "/reports", section: "التقارير" });
+    // قائمة مختصرة: كل قسم لغرض واحد. الفروع داخل صفحة العميل، وسجلات الصيانة داخل الأجهزة والتقارير، والإشعارات في الشريط العلوي.
+    // للفني الميداني: «عملي» يجمع زياراته الدورية والطارئة والمعاينات والبلاغات، فلا تتكرر أقسامها.
+    const fieldOnly = field && !any("visits.view", "maintenance.view", "faults.view");
+    if (field) items.push({ label: "عملي", icon: "clock", href: "/my-work" });
+    if (any("customers.view") || field) items.push({ label: "العملاء والفروع", icon: "building", href: "/customers", section: "العمل" });
+    if (!fieldOnly && any("visits.view", "visits.create")) items.push({ label: "الزيارات والمعاينات", icon: "calendar", href: "/visits", section: "العمل" });
+    if (any("quotes.view", "quotes.manage")) items.push({ label: "عروض الأسعار", icon: "file", href: "/quotes", section: "العمل" });
+    if (any("devices.view") || field) items.push({ label: "الأجهزة", icon: "shield", href: "/devices", section: "العمل" });
+    if (phase5 && !fieldOnly && any("faults.view", "faults.update")) items.push({ label: "البلاغات والأعطال", icon: "shieldAlert", href: "/faults", section: "العمل" });
+    if (any("reports.view")) items.push({ label: "التقارير", icon: "chart", href: "/reports", section: "العمل" });
+    // إدارة أعضاء الشركة ودعواتهم والفنيين لمدير الشركة؛ الإسناد التشغيلي لمن يملكه
+    if (m.is_owner) items.push({ label: "الفريق والدعوات", icon: "userCog", href: "/team", section: "الإدارة" });
+    if (any("assignments.manage")) items.push({ label: "إسناد الفنيين", icon: "link", href: "/assignments", section: "الإدارة" });
+    if (any("catalog.manage")) items.push({ label: "كتالوج الأجهزة", icon: "book", href: "/catalog", section: "الإدارة" });
     if (any("settings.branding")) items.push({ label: "هوية الشركة", icon: "settings", href: "/settings/company", section: "الإدارة" });
     if (m.is_owner) items.push({ label: "سجل التدقيق", icon: "history", href: "/settings/audit", section: "الإدارة" });
-    // إدارة أعضاء الشركة ودعواتهم (على جداول company_memberships / company_invitations) لمدير الشركة
-    if (m.is_owner) items.push({ label: "فريق الشركة والدعوات", icon: "userCog", href: "/team", section: "الإدارة" });
   }
-  items.push({ label: "الإشعارات", icon: "bell", href: "/notifications", section: m ? "الإدارة" : "" });
+  if (!m) items.push({ label: "الإشعارات", icon: "bell", href: "/notifications" });
   if (ctx.platformPermissions.has("platform.companies.view")) items.push({ label: "إدارة الشركات (المنصة)", icon: "building", href: "/platform-admin", section: "المنصة" });
   if (ctx.platformRole === "owner") items.push({ label: "مساعدو المالك", icon: "userCog", href: "/platform-admin/assistants", section: "المنصة" });
   if (ctx.platformPermissions.has("platform.branding")) items.push({ label: "إعدادات المنصة", icon: "settings", href: "/platform-admin/settings", section: "المنصة" });

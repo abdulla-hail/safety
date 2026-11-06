@@ -28,7 +28,6 @@ const RECORDS = {
   safety_systems: { module: "catalog", list: "/catalog", detail: "/catalog" },
   catalog_items: { module: "catalog", list: "/catalog", detail: null },
   devices: { module: "devices", list: "/devices", detail: "/devices" },
-  work_orders: { module: "work_orders", list: "/work-orders", detail: "/work-orders" },
   visits: { module: "visits", list: "/visits", detail: "/visits" },
 } as const;
 

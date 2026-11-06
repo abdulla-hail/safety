@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import InfoGrid from "@/components/ui/InfoGrid";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -38,7 +38,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
   // جولة واحدة: الزيارة مع أجهزة عميلها ومواقعه مضمّنة، وفنيوها وسجلاتها وبنودها بالمعرّف
   const [{ data: v }, techRows, records, allTechs, items] = await Promise.all([
     supabase.from("visits")
-      .select(`*, customer:customers(id, name, devices(id, ref_no, name, status, next_maintenance_at, site_id, archived_at)${mayEdit ? ", sites:customer_sites(id, name, archived_at)" : ""}), site:customer_sites(id, name), work_order:work_orders(id, ref_no, title)`)
+      .select(`*, customer:customers(id, name, devices(id, ref_no, name, status, next_maintenance_at, site_id, archived_at)${mayEdit ? ", sites:customer_sites(id, name, archived_at)" : ""}), site:customer_sites(id, name)`)
       .eq("id", id).eq("company_id", ctx.orgId).is("customer.devices.archived_at", null)
       .order("next_maintenance_at", { referencedTable: "customer.devices", nullsFirst: false }).limit(300, { referencedTable: "customer.devices" })
       .maybeSingle(),
@@ -49,6 +49,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
       .eq("visit_id", id).order("created_at") : null,
   ]);
   if (!v) notFound();
+  if (v.visit_type === "survey") redirect(`/visits/${id}/survey`);
   type It = { id: string; device_id: string; inspection_status: string; result: string | null; status_after: string | null; skip_reason: string | null;
     follow_up_needed: boolean; fault_id: string | null; device: { name: string; ref_no: string } | null };
   const itemRows = (items?.data ?? []) as unknown as It[];
@@ -84,7 +85,6 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
         <InfoGrid items={[
           ["العميل", v.customer && <Link href={`/customers/${v.customer.id}`} className={link}>{v.customer.name}</Link>],
           ["الموقع", v.site ? <Link href={`/sites/${v.site.id}`} className={link}>{v.site.name}</Link> : "—"],
-          ["أمر العمل", v.work_order ? <Link href={`/work-orders/${v.work_order.id}`} className={link}>{v.work_order.ref_no} — {v.work_order.title}</Link> : "—"],
           ["نوع الزيارة", visitType[v.visit_type] ?? v.visit_type],
           ["نتيجة الزيارة", v.outcome ? <StatusBadge key="o" {...(visitOutcome[v.outcome] ?? { label: v.outcome, tone: "neutral" })} /> : "—"],
           ["الموعد", formatDateTime(v.scheduled_start)], ["الانتهاء المتوقع", formatDateTime(v.scheduled_end)],
@@ -190,7 +190,6 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
             <EntityForm action={updateVisit} initial={{ ...v, scheduled_start: toLocalInput(v.scheduled_start), scheduled_end: toLocalInput(v.scheduled_end) }}
               fields={[
                 { name: "id", label: "", type: "hidden" },
-                { name: "work_order_id", label: "", type: "hidden" },
                 ...(phase5 ? [{ name: "visit_type", label: "نوع الزيارة", type: "select" as const, options: toOptions(visitType) }] : []),
                 { name: "scheduled_start", label: "موعد البدء", type: "datetime-local", required: true, help: "تغيير الموعد يرسل إشعارًا للفنيين المعيّنين." },
                 { name: "scheduled_end", label: "الانتهاء المتوقع", type: "datetime-local" },

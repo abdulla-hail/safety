@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 /** المسارات المتاحة دون جلسة */
 // صفحتا الدعوة تُعرضان قبل الدخول (بهوية الجهة الداعية) بعد التحقق من الرمز؛ القبول نفسه يتطلب الجلسة
 // بيان التطبيق وأيقوناته وعامل الخدمة يطلبها المتصفح قبل الدخول أيضًا (تعرض هوية المنصة حينها)
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/invite", "/assistant-invite", "/app-manifest", "/app-icon", "/sw.js"];
+const PUBLIC_PATHS = ["/s", "/login", "/auth/callback", "/invite", "/assistant-invite", "/app-manifest", "/app-icon", "/sw.js"];
 
 export async function updateSession(request: NextRequest) {
   // عودة Google OAuth إلى عنوان الموقع الافتراضي (عندما لا يكون مسار العودة ضمن روابط Supabase المسموحة):

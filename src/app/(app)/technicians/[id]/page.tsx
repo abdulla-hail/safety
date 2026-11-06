@@ -9,7 +9,7 @@ import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid, param, type SearchParams } from "@/lib/list";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { TECHNICIAN_SPECIALTIES, auditAction, auditEntity, technicianAvailability, visitStatus, workOrderStatus } from "@/lib/labels";
+import { TECHNICIAN_SPECIALTIES, auditAction, auditEntity, technicianAvailability, visitStatus } from "@/lib/labels";
 import AssignmentPanel from "../AssignmentPanel";
 
 export const metadata = { title: "ملف الفني | عين السلامة" };
@@ -21,9 +21,8 @@ export default async function TechnicianPage({ params, searchParams }: { params:
   if (!isUuid(id)) notFound();
   const supabase = await createClient();
   // جولة متوازية واحدة: السجلات المرتبطة مقيدة بمعرّف الفني وRLS، فلا حاجة لانتظار سجل الفني أولًا
-  const [{ data: t }, wos, visits, audit] = await Promise.all([
+  const [{ data: t }, visits, audit] = await Promise.all([
     supabase.from("technicians").select("*").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
-    supabase.from("work_order_technicians").select("work_order:work_orders(id, ref_no, title, status)").eq("technician_id", id).order("created_at", { ascending: false }).limit(8),
     supabase.from("visit_technicians").select("visit:visits(id, ref_no, scheduled_start, status, customer:customers(name))").eq("technician_id", id).order("created_at", { ascending: false }).limit(8),
     ctx.active.is_owner
       ? supabase.from("company_audit_log").select("id, action, target_type, details, created_at").eq("company_id", ctx.orgId)
@@ -31,9 +30,7 @@ export default async function TechnicianPage({ params, searchParams }: { params:
       : null,
   ]);
   if (!t) notFound();
-  type WO = { id: string; ref_no: string; title: string; status: string };
   type V = { id: string; ref_no: string; scheduled_start: string; status: string; customer: { name: string } | null };
-  const woList = ((wos.data ?? []) as unknown as { work_order: WO | null }[]).map((x) => x.work_order).filter((x): x is WO => !!x);
   const vList = ((visits.data ?? []) as unknown as { visit: V | null }[]).map((x) => x.visit).filter((x): x is V => !!x);
 
   return (
@@ -62,18 +59,6 @@ export default async function TechnicianPage({ params, searchParams }: { params:
         canAssign={ctx.can("assignments.manage") && !t.archived_at} />
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <section className={card}>
-          <div className={cardHeader}><h2 className={cardTitle}>أوامر العمل المعيّنة</h2></div>
-          <ul className="divide-y divide-slate-100">
-            {woList.map((w) => (
-              <li key={w.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                <div><Link href={`/work-orders/${w.id}`} className={link}>{w.title}</Link><p className="text-xs text-slate-500" dir="ltr">{w.ref_no}</p></div>
-                <StatusBadge {...(workOrderStatus[w.status] ?? { label: w.status, tone: "neutral" })} />
-              </li>
-            ))}
-            {woList.length === 0 && <li className="px-5 py-4 text-sm text-slate-500">لا توجد أوامر عمل.</li>}
-          </ul>
-        </section>
         <section className={card}>
           <div className={cardHeader}><h2 className={cardTitle}>الزيارات</h2></div>
           <ul className="divide-y divide-slate-100">

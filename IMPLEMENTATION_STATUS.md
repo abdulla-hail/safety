@@ -447,9 +447,18 @@
 - **الاختبارات:** PGlite 7/7، `npm test` 86/86، TypeScript/Lint/Build ✓؛ حي متراجع عنه: `verify-cgwn-wo-flow` 28/28 و`verify-cgwn-visit-flow` 29/29؛ فحص هيكلي لاستعلامات الصفحات على واجهة Supabase الحية.
 - **ملاحظة بيانات:** أحد الفنيين الثلاثة له صلاحيات مخصصة بلا «تسجيل بلاغ عطل» فيُرفض تسجيله البلاغ (سلوك صحيح؛ لم تُعدَّل صلاحياته).
 - **لم يُختبر:** المتصفح بحساب مسجّل، ورفع ملف فعلي إلى التخزين وحذفه عبر واجهة Supabase (التحقق كان على مستوى القاعدة والسياسات).
-### الحذف الكامل للشركة وأسباب البطء (2026-10-28) — كود محلي + 3 ترحيلات مقترحة (**غير مطبّقة**)
+### الحذف الكامل للشركة وأسباب البطء (2026-10-28) — ترحيلا الأداء 0200/0300 مطبّقان؛ ترحيل الحذف 0100 مقترح غير مطبّق
 - التقرير الكامل بالأرقام: `docs/PERF_AND_PURGE_2026-10-28.md`.
 - الحذف الكامل: `supabase/proposed/20261109000100_company_purge.sql`، الإجراءان `purgeCompany`/`cleanOrphanFiles` في `platform-admin/actions.ts`، `PurgeCompanyForm.tsx` وقسم المعاينة في `platform-admin/[id]/page.tsx`، و«ملفات شركات محذوفة» في `platform-admin/page.tsx`.
 - الأداء في الكود: `src/lib/schema.ts` (نتيجة «مطبّق» نهائية)، `src/lib/auth/context.ts` (عرض السياق الأخير وتحديثه في الخلفية حتى 5 دقائق)، جولة واحدة في `platform-admin`، `technicians/[id]`، `catalog/[id]`، `devices/new`؛ `AYS_PERF_LOG=1` في `src/lib/supabase/server.ts`.
 - ترحيلات الأداء: `20261109000200_fk_indexes` و`20261109000300_rls_initplan`.
 - الاختبارات: `npm test` 97/97، TypeScript/Lint/Build ✓. لم يُختبر شيء على القاعدة الحية ولا في المتصفح بجلسة.
+### تبسيط المنصة: المعاينات وعروض الأسعار والخرائط (2026-11-06) — `20261110000100_surveys_quotes_maps` (طُبّق)
+- أُزيلت أوامر العمل من الواجهة والقائمة والروابط (الجداول وبياناتها باقية في القاعدة). القائمة: العمل (العملاء والفروع، الزيارات والمعاينات، عروض الأسعار، الأجهزة، البلاغات، التقارير) والإدارة.
+- الفروع: إحداثيات على خريطة (Leaflet/OpenStreetMap) واتجاهات Google — `src/components/map/`، `src/lib/geo.ts`.
+- المعاينات: نوع زيارة `survey` على جدول الزيارات نفسه + `survey_items`؛ الصفحات `visits/new`، `visits/[id]/survey`، `print/survey/[id]`؛ الإجراءات `visits/survey-actions.ts`.
+- عروض الأسعار: `quotations`/`quotation_items` وحالات قيد الإعداد/مرسل/مقبول/مرفوض عبر `quotation_set_status`؛ الصفحات `quotes`، `quotes/new`، `quotes/[id]`، `print/quote/[id]`.
+- المشاركة: `share_links` (تجزئة الرمز فقط) + `shared_document` للزائر + الصفحة العامة `/s/[token]`.
+- الحساب: `src/lib/money.ts` (ضريبة 15٪ اختيارية، تقريب للهللة) ويطابق حساب القاعدة.
+- التطبيق: نقطة استعادة `restore-point-20261106-163537`، تجربة جافة 55/55، تطبيق 49/49؛ verify 18/18، verify-ops 14/14، verify-workflows 127/127.
+- الاختبارات: `npm test` 109/109 (منها `tests/cgwn/surveys-quotes.test.mjs`)، TypeScript/Lint/Build ✓. **لم يُختبر في المتصفح بجلسة مسجّلة.**

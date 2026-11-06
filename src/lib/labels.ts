@@ -14,7 +14,20 @@ export const deviceStatus: LabelMap = {
 };
 
 export const visitType: Record<string, string> = {
-  periodic: "دورية", emergency: "طارئة", repair: "إصلاح", reinspection: "إعادة فحص", installation: "تركيب", other: "أخرى",
+  survey: "معاينة", periodic: "صيانة دورية", emergency: "طارئة", repair: "إصلاح", reinspection: "إعادة فحص", installation: "تركيب", other: "أخرى",
+};
+
+/** نوع المشكلة في بند المعاينة */
+export const surveyIssue: Record<string, string> = {
+  needs_maintenance: "يحتاج صيانة", faulty: "عطل", missing: "غير موجود / ناقص", expired: "منتهي الصلاحية",
+  needs_replacement: "يحتاج استبدال", installation: "تركيب جديد", other: "أخرى",
+};
+
+export const quoteStatus: LabelMap = {
+  draft: { label: "قيد الإعداد", tone: "neutral" },
+  sent: { label: "مرسل", tone: "info" },
+  accepted: { label: "مقبول", tone: "success" },
+  rejected: { label: "مرفوض", tone: "danger" },
 };
 
 export const visitOutcome: LabelMap = {
@@ -208,6 +221,7 @@ export const auditEntity: Record<string, string> = {
   device: "جهاز",
   work_order: "أمر عمل",
   visit: "زيارة",
+  quotation: "عرض سعر",
   maintenance: "سجل صيانة",
   attachment: "مرفق",
   technician_customer: "إسناد فني لعميل",

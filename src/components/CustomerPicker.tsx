@@ -15,6 +15,7 @@ export default async function CustomerPicker({ orgId, basePath, search }: { orgI
   return (
     <section className={`${card} p-5`}>
       <Form action={basePath.split("?")[0]} className="mb-4 flex gap-2">
+        {[...new URLSearchParams(basePath.split("?")[1] ?? "")].map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
         <input name="q" type="search" defaultValue={search} placeholder="ابحث عن العميل بالاسم أو الرقم..." className={input} aria-label="بحث عن العميل" />
         <button type="submit" className={btnSecondary}>بحث</button>
       </Form>

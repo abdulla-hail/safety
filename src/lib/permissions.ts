@@ -12,8 +12,8 @@ export const PERMISSION_MODULES = [
   { key: "field", label: "العمل الميداني" },
   { key: "catalog", label: "كتالوج أجهزة السلامة" },
   { key: "devices", label: "الأجهزة" },
-  { key: "work_orders", label: "أوامر العمل" },
-  { key: "visits", label: "الزيارات" },
+  { key: "visits", label: "الزيارات والمعاينات" },
+  { key: "quotes", label: "عروض الأسعار" },
   { key: "maintenance", label: "الصيانة" },
   { key: "faults", label: "البلاغات والأعطال" },
   { key: "reports", label: "التقارير" },
@@ -50,13 +50,6 @@ export const PERMISSIONS = [
   ["devices.delete", "حذف جهاز نهائيًا"],
   ["devices.print", "طباعة ملصقات الأجهزة"],
   ["devices.transfer", "نقل جهاز إلى عميل آخر"],
-  ["work_orders.view", "عرض جميع أوامر العمل"],
-  ["work_orders.create", "إنشاء أمر عمل"],
-  ["work_orders.update", "تعديل أمر عمل وحالته"],
-  ["work_orders.archive", "أرشفة واستعادة أوامر العمل"],
-  ["work_orders.delete", "حذف أمر عمل نهائيًا"],
-  ["work_orders.assign", "تعيين فنيين لأوامر العمل"],
-  ["work_orders.approve", "اعتماد أوامر العمل"],
   ["visits.view", "عرض جميع الزيارات"],
   ["visits.create", "جدولة زيارة"],
   ["visits.update", "تعديل زيارة وحالتها"],
@@ -70,6 +63,8 @@ export const PERMISSIONS = [
   ["faults.view", "عرض جميع البلاغات والأعطال"],
   ["faults.create", "تسجيل بلاغ عطل"],
   ["faults.update", "إدارة البلاغات وإغلاقها"],
+  ["quotes.view", "عرض عروض الأسعار"],
+  ["quotes.manage", "إنشاء عروض الأسعار وتعديلها وإرسالها"],
   ["reports.view", "الاطلاع على التقارير"],
   ["reports.export", "تصدير التقارير"],
   ["reports.print", "طباعة التقارير والمستندات"],
@@ -106,7 +101,7 @@ export const JOB_ROLE_LABELS: Record<string, string> = Object.fromEntries(JOB_RO
 
 const VIEW_ALL: Permission[] = [
   "customers.view", "sites.view", "technicians.view", "catalog.view", "devices.view",
-  "work_orders.view", "visits.view", "maintenance.view",
+  "visits.view", "maintenance.view",
 ];
 
 export const ROLE_PRESETS: Record<string, Permission[]> = {
@@ -115,13 +110,12 @@ export const ROLE_PRESETS: Record<string, Permission[]> = {
     ...VIEW_ALL,
     "customers.create", "customers.update", "sites.create", "sites.update",
     "assignments.manage", "devices.create", "devices.update", "devices.print",
-    "work_orders.create", "work_orders.update", "work_orders.assign", "work_orders.approve",
     "visits.create", "visits.update", "maintenance.create",
-    "faults.view", "faults.create", "faults.update", "visits.close_exception", "maintenance.reschedule",
+    "faults.view", "faults.create", "faults.update", "visits.close_exception", "maintenance.reschedule", "quotes.view", "quotes.manage",
     "reports.view", "reports.print", "reports.export",
   ],
   technician: ["field.assigned", "catalog.view", "maintenance.create", "devices.print", "visits.update", "faults.create"],
-  accountant: [...VIEW_ALL, "faults.view", "reports.view", "reports.export", "reports.print"],
+  accountant: [...VIEW_ALL, "faults.view", "quotes.view", "reports.view", "reports.export", "reports.print"],
   storekeeper: ["catalog.view", "catalog.manage", "devices.view", "reports.view"],
   viewer: [...VIEW_ALL, "reports.view"],
 };

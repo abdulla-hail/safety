@@ -14,7 +14,6 @@ const ENTITY: Record<string, { perm: Permission[]; path: string }> = {
   device: { perm: ["devices.update", "devices.create"], path: "/devices" },
   customer: { perm: ["customers.update"], path: "/customers" },
   site: { perm: ["sites.update"], path: "/sites" },
-  work_order: { perm: ["work_orders.update"], path: "/work-orders" },
   visit: { perm: ["visits.update"], path: "/visits" },
   maintenance: { perm: ["maintenance.create"], path: "/maintenance" },
   fault: { perm: ["faults.create", "faults.update"], path: "/faults" },
@@ -48,18 +47,20 @@ export async function uploadAttachment(prev: ActionState, fd: FormData): Promise
   const [phase5, woExec] = await Promise.all([hasPhase5(supabase), hasWorkOrderExecution(supabase)]);
   const stage = phase5 ? str(fd, "photo_stage") : "";
   const deviceId = phase5 ? str(fd, "device_id") : "";
+  const surveyItem = str(fd, "survey_item_id");
   const { error } = await supabase.from("attachments").insert({
     company_id: ctx.orgId, entity_type: type, entity_id: entityId, storage_path: path,
     file_name: file.name.slice(0, 200), mime_type: file.type, size_bytes: file.size,
     ...((woExec ? STAGES_WO : STAGES_P5).includes(stage) ? { photo_stage: stage } : {}),
     ...(isUuid(deviceId) ? { device_id: deviceId } : {}),
+    ...(isUuid(surveyItem) ? { survey_item_id: surveyItem } : {}),
   });
   if (error) {
     await supabase.storage.from("org-files").remove([path]);
     return { ok: false, message: dbErrorMessage(error), attempt };
   }
   revalidatePath(`${cfg.path}/${entityId}`);
-  if (type === "visit") revalidatePath(`/visits/${entityId}/run`);
+  if (type === "visit") { revalidatePath(`/visits/${entityId}/run`); revalidatePath(`/visits/${entityId}/survey`); }
   return { ok: true, message: "تم رفع المرفق.", attempt };
 }
 

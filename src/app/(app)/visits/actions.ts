@@ -16,11 +16,9 @@ const FOLLOW = ["none", "required", "scheduled", "done"];
 
 function payload(fd: FormData, phase5: boolean) {
   const site = str(fd, "site_id");
-  const wo = str(fd, "work_order_id");
   const type = str(fd, "visit_type");
   return {
     site_id: isUuid(site) ? site : null,
-    work_order_id: isUuid(wo) ? wo : null,
     scheduled_start: fromLocalInput(str(fd, "scheduled_start")),
     scheduled_end: fromLocalInput(str(fd, "scheduled_end")),
     notes: strOrNull(fd, "notes"),

@@ -7,13 +7,12 @@ import { Suspense } from "react";
 import { requireOrg } from "@/lib/auth/context";
 import { logLoadError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
-import { hasInspections, hasPhase5, hasWorkOrderExecution } from "@/lib/schema";
+import { hasInspections, hasPhase5 } from "@/lib/schema";
 import { isUuid, param, withParams, type SearchParams } from "@/lib/list";
 import { addDaysISO, daysUntil, formatDate, formatDateTime, todayISO } from "@/lib/format";
-import { faultSeverity, faultStatus, visitOutcome, visitStatus, visitType, workOrderPriority, workOrderStatus, workOrderType } from "@/lib/labels";
+import { faultSeverity, faultStatus, visitOutcome, visitStatus, visitType } from "@/lib/labels";
 import { URGENT_REASONS, bucketFor, groupDueBySite, matchesQuery, periodStart, progressPercent } from "@/lib/visits";
 import StartVisitButton from "./StartVisitButton";
-import StartWoVisitButton from "./StartWoVisitButton";
 
 export const metadata: Metadata = { title: "عملي | عين السلامة" };
 
@@ -39,7 +38,7 @@ export default function MyWorkPage({ searchParams }: { searchParams: Promise<Sea
   return (
     <div className="space-y-6">
       <PageHeader title="عملي" description="الزيارات الدورية المستحقة والمتأخرة، والزيارات المفتوحة والمجدولة، والبلاغات والمتابعات، وسجل زياراتك — ضمن نطاق إسنادك فقط."
-        actions={<Link href="/scan" className={btnSecondary}>مسح رمز جهاز</Link>} />
+        actions={<><Link href="/scan" className={btnSecondary}>مسح رمز جهاز</Link><Link href="/visits/new?type=survey" className={btnPrimary}>+ زيارة معاينة</Link></>} />
       <Suspense fallback={<MyWorkLoading />}>
         <MyWorkContent searchParams={searchParams} />
       </Suspense>
@@ -71,7 +70,7 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
     type: ["periodic", "urgent"].includes(param(sp, "type")) ? param(sp, "type") : "", status: ["open", "closed"].includes(param(sp, "status")) ? param(sp, "status") : "",
     period: ["7", "30", "90", "365"].includes(param(sp, "period")) ? param(sp, "period") : "30",
   };
-  const [phase5, inspections, woExec] = await Promise.all([hasPhase5(supabase), hasInspections(supabase), hasWorkOrderExecution(supabase)]);
+  const [phase5, inspections] = await Promise.all([hasPhase5(supabase), hasInspections(supabase)]);
   const since = periodStart(f.period, today);
 
   const visitCols = "id, ref_no, scheduled_start, actual_start, actual_end, status, customer_id, site_id, customer:customers(name), site:customer_sites(name)"
@@ -88,7 +87,7 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
 
   const faultCols = "id, ref_no, description, status, severity, reported_at, site_id, customer_id, device:devices(id, name, ref_no), site:customer_sites(name)"
     + (inspections ? ", kind, follow_up_due, assigned_technician_id, assignee:technicians!df_assignee_fk(full_name)" : "");
-  const [sites, due, open, hist, faults, wos, me] = await Promise.all([
+  const [sites, due, open, hist, faults, me] = await Promise.all([
     supabase.from("customer_sites").select("id, name, customer_id, customer:customers(name)").eq("company_id", org).is("archived_at", null).order("name").limit(500),
     supabase.from("devices").select("id, ref_no, name, status, next_maintenance_at, site_id, customer_id")
       .eq("company_id", org).is("archived_at", null).not("status", "in", "(decommissioned,replaced)").lte("next_maintenance_at", addDaysISO(today, HORIZON))
@@ -97,8 +96,6 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
     f.status === "open" ? null : histQ,
     phase5 ? supabase.from("device_faults").select(faultCols).eq("company_id", org).is("archived_at", null)
       .in("status", ["open", "in_progress", "awaiting_verification"]).order("reported_at", { ascending: false }).limit(60) : null,
-    supabase.from("work_orders").select("id, ref_no, title, description, status, priority, order_type, due_at, scheduled_for, customer_id, site_id, customer:customers(name), site:customer_sites(name), devices:work_order_devices(device:devices(name)), techs:work_order_technicians(technician_id), visits(id, status, closed_at, archived_at)")
-      .eq("company_id", org).is("archived_at", null).in("status", ["new", "scheduled", "in_progress", "on_hold"]).order("due_at", { nullsFirst: false }).limit(30),
     supabase.from("technicians").select("id").eq("company_id", org).eq("user_id", ctx.user.id).is("archived_at", null).limit(1).maybeSingle(),
   ]);
 
@@ -106,9 +103,9 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
   const err = {
     open: logLoadError("my-work/open-visits", open?.error), hist: logLoadError("my-work/visit-history", hist?.error),
     faults: logLoadError("my-work/faults", faults?.error), due: logLoadError("my-work/due-devices", due.error),
-    sites: logLoadError("my-work/sites", sites.error), wos: logLoadError("my-work/work-orders", wos.error), me: logLoadError("my-work/technician", me.error),
+    sites: logLoadError("my-work/sites", sites.error), me: logLoadError("my-work/technician", me.error),
   };
-  const loadNotes = [sites.error && `المواقع${err.sites}`, wos.error && `أوامر العمل${err.wos}`, me.error && `سجل الفني${err.me}`].filter(Boolean) as string[];
+  const loadNotes = [sites.error && `المواقع${err.sites}`, me.error && `سجل الفني${err.me}`].filter(Boolean) as string[];
   type S = { id: string; name: string; customer_id: string; customer: { name: string } | null };
   type D = { id: string; ref_no: string; name: string; status: string; next_maintenance_at: string | null; site_id: string | null; customer_id: string };
   type V = { id: string; ref_no: string; scheduled_start: string; actual_start: string | null; actual_end: string | null; status: string; customer_id: string; site_id: string | null;
@@ -134,15 +131,6 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
   const openVisits = ((open?.data ?? []) as unknown as V[]).filter(vMatch);
   const history = ((hist?.data ?? []) as unknown as V[]).filter(vMatch);
   const openBySite = new Map(openVisits.filter((v) => (v.visit_type ?? "periodic") === "periodic" && v.site_id).map((v) => [v.site_id!, v]));
-  type WO = { id: string; ref_no: string; title: string; description: string | null; status: string; priority: string; order_type: string; due_at: string | null;
-    scheduled_for: string | null; customer_id: string; site_id: string | null; customer: { name: string } | null; site: { name: string } | null;
-    devices: { device: { name: string } | null }[] | null; techs: { technician_id: string }[] | null;
-    visits: { id: string; status: string; closed_at?: string | null; archived_at: string | null }[] | null };
-  const woList = ((wos.data ?? []) as unknown as WO[])
-    .filter((w) => f.type !== "periodic" && f.status !== "closed" && inScope(w.customer_id, w.site_id) && matchesQuery(f.q, w.ref_no, w.title, w.customer?.name, w.site?.name))
-    // المسند إليك أولًا ثم الأعلى أولوية
-    .sort((a, b) => Number((b.techs ?? []).some((t) => t.technician_id === myTech)) - Number((a.techs ?? []).some((t) => t.technician_id === myTech))
-      || ["critical", "high", "medium", "low"].indexOf(a.priority) - ["critical", "high", "medium", "low"].indexOf(b.priority));
 
   const counts = {
     overdue: devices.filter((d) => bucketFor(d.next_maintenance_at, today, HORIZON) === "overdue").length,
@@ -157,7 +145,8 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
     const done = v.items.filter((i) => i.inspection_status !== "pending").length;
     return { done, total: v.items.length, pct: progressPercent(done, v.items.length) };
   };
-  const isUrgent = (v: V) => (v.visit_type ?? "periodic") !== "periodic";
+  const isUrgent = (v: V) => !["periodic", "survey"].includes(v.visit_type ?? "periodic");
+  const visitHref = (v: V) => v.visit_type === "survey" ? `/visits/${v.id}/survey` : `/visits/${v.id}`;
   const canStart = inspections && ctx.canAny("visits.create", "visits.update");
   const clear = Object.values({ ...f, period: f.period === "30" ? "" : f.period }).some(Boolean);
 
@@ -169,7 +158,7 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
       <li className={`flex flex-wrap items-center justify-between gap-3 border-s-4 px-5 py-3 text-sm ${urgent ? "border-danger" : late ? "border-amber-500" : "border-sky-500"}`}>
         <div className="min-w-0 space-y-0.5">
           <p className="flex flex-wrap items-center gap-2">
-            <Link href={`/visits/${v.id}`} className={link}>{v.site?.name ?? v.customer?.name ?? "—"}</Link>
+            <Link href={visitHref(v)} className={link}>{v.site?.name ?? v.customer?.name ?? "—"}</Link>
             <StatusBadge label={urgent ? `طارئة${v.urgent_reason ? ` · ${URGENT_REASONS[v.urgent_reason] ?? ""}` : ""}` : visitType[v.visit_type ?? "periodic"] ?? "دورية"} tone={urgent ? "danger" : "info"} />
             {late && <StatusBadge label="موعدها فات" tone="warning" />}
           </p>
@@ -183,7 +172,8 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge {...(visitStatus[v.status] ?? { label: v.status, tone: "neutral" })} />
-          {inspections && ctx.can("visits.update") && <Link href={`/visits/${v.id}/run`} className={`${btnPrimary} ${btnSm}`}>{v.status === "in_progress" ? "استئناف" : "بدء التنفيذ"}</Link>}
+          {v.visit_type === "survey" ? <Link href={visitHref(v)} className={`${btnPrimary} ${btnSm}`}>{v.closed_at ? "التقرير" : v.status === "in_progress" ? "متابعة المعاينة" : "بدء المعاينة"}</Link>
+            : inspections && ctx.can("visits.update") && <Link href={`/visits/${v.id}/run`} className={`${btnPrimary} ${btnSm}`}>{v.status === "in_progress" ? "استئناف" : "بدء التنفيذ"}</Link>}
         </div>
       </li>
     );
@@ -345,40 +335,6 @@ async function MyWorkContent({ searchParams }: { searchParams: Promise<SearchPar
             })}
             {faults?.error ? <li role="alert" className="px-5 py-4 text-sm text-red-700">تعذر تحميل البلاغات حاليًا{err.faults}.</li>
               : faultList.length === 0 && <li className="px-5 py-4 text-sm text-slate-500">لا توجد بلاغات أو متابعات مفتوحة.</li>}
-          </ul>
-        </section>
-      )}
-
-      {(woList.length > 0 || wos.error) && (
-        <section id="work-orders" className={card}>
-          <div className={cardHeader}><h2 className={cardTitle}>أوامر العمل ({woList.length})</h2>
-            <span className="text-xs text-slate-500">المسندة إليك أولًا · الطارئة بإطار أحمر</span></div>
-          <ul className="divide-y divide-slate-100">
-            {woList.map((w) => {
-              const mine = !!myTech && (w.techs ?? []).some((t) => t.technician_id === myTech);
-              const openV = (w.visits ?? []).find((x) => !x.archived_at && !x.closed_at && ["scheduled", "in_progress"].includes(x.status));
-              const devs = (w.devices ?? []).map((d) => d.device?.name).filter(Boolean) as string[];
-              const urgentWo = w.order_type === "emergency" || w.priority === "critical" || w.priority === "high";
-              return (
-                <li key={w.id} className={`flex flex-wrap items-start justify-between gap-3 border-s-4 px-5 py-3 text-sm ${urgentWo ? "border-danger" : "border-slate-300"}`}>
-                  <div className="min-w-0 space-y-0.5">
-                    <p className="flex flex-wrap items-center gap-2"><Link href={`/work-orders/${w.id}`} className={link}>{w.title}</Link>
-                      {mine && <StatusBadge label="مسند إليك" tone="info" />}</p>
-                    <p className="text-xs text-slate-500">{workOrderType[w.order_type] ?? w.order_type} · {w.customer?.name ?? "—"}{w.site ? ` · ${w.site.name}` : " · بلا موقع"} · <span dir="ltr">{w.ref_no}</span>
-                      {w.scheduled_for && ` · الموعد ${formatDateTime(w.scheduled_for)}`}{w.due_at && ` · الاستحقاق ${formatDate(w.due_at)}`}</p>
-                    {devs.length > 0 && <p className="text-xs text-slate-600">الأجهزة: {devs.slice(0, 5).join("، ")}{devs.length > 5 ? ` و${devs.length - 5} أخرى` : ""}</p>}
-                    {w.description && <p className="line-clamp-2 text-xs text-slate-600">{w.description}</p>}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <StatusBadge {...(workOrderPriority[w.priority] ?? { label: w.priority, tone: "neutral" as Tone })} />
-                    <StatusBadge {...(workOrderStatus[w.status] ?? { label: w.status, tone: "neutral" as Tone })} />
-                    {woExec && openV ? <Link href={`/visits/${openV.id}/run`} className={`${btnPrimary} ${btnSm}`}>متابعة الزيارة</Link>
-                      : woExec && w.site_id && (mine || ctx.can("visits.create")) ? <StartWoVisitButton workOrderId={w.id} clientKey={crypto.randomUUID()} className={`${btnPrimary} ${btnSm}`} /> : null}
-                  </div>
-                </li>
-              );
-            })}
-            {wos.error && <li role="alert" className="px-5 py-4 text-sm text-red-700">تعذر تحميل أوامر العمل حاليًا{err.wos}.</li>}
           </ul>
         </section>
       )}

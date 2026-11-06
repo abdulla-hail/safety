@@ -115,19 +115,6 @@ export async function closeVisit(prev: ActionState, fd: FormData): Promise<Actio
   redirect(`/visits/${visit}?ok=closed`);
 }
 
-/** بدء الزيارة من أمر عمل مسند (أو استئناف زيارته المفتوحة)؛ القاعدة تتحقق من الإسناد والصلاحية وتمنع التكرار */
-export async function startWorkOrderVisit(prev: ActionState, fd: FormData): Promise<ActionState> {
-  const ctx = await orgForAction("visits.update", "visits.create");
-  const wo = str(fd, "work_order_id");
-  if (!ctx || !isUuid(wo)) return fail(prev, fd, "ليست لديك صلاحية تنفيذ أوامر العمل.");
-  const key = str(fd, "client_key");
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("work_order_start_visit", { p_wo: wo, p_client_key: isUuid(key) ? key : crypto.randomUUID() });
-  if (error) return fail(prev, fd, dbErrorMessage(error));
-  revalidatePath("/my-work");
-  revalidatePath(`/work-orders/${wo}`);
-  redirect(`/visits/${data as string}/run`);
-}
 
 export interface ReportSaveState { ok: boolean; message: string; savedAt?: string }
 

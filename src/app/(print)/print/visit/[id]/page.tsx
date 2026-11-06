@@ -26,7 +26,7 @@ export default async function PrintVisit({ params }: { params: Promise<{ id: str
   // فحص الترحيلات محفوظ في الذاكرة بعد أول طلب؛ ثم جولة واحدة متوازية لكل بيانات التقرير (كانت ثلاث جولات متتابعة)
   const [inspections, woExec] = await Promise.all([hasInspections(supabase), hasWorkOrderExecution(supabase)]);
   const [{ data: v }, b, techs, records, items, faultRows, files] = await Promise.all([
-    supabase.from("visits").select("*, customer:customers(name, ref_no), site:customer_sites(name, city, address), work_order:work_orders(ref_no, title)").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
+    supabase.from("visits").select("*, customer:customers(name, ref_no), site:customer_sites(name, city, address)").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
     loadBranding(supabase, ctx.orgId),
     supabase.from("visit_technicians").select("technician:technicians(full_name, ref_no)").eq("visit_id", id),
     supabase.from("maintenance_records").select("id, ref_no, performed_at, action, result, status_after, notes, next_due_at, device_ref_snapshot, device_name_snapshot").eq("visit_id", id).order("performed_at"),
@@ -64,7 +64,7 @@ export default async function PrintVisit({ params }: { params: Promise<{ id: str
       <PrintDocument b={b} title={urgent ? "تقرير زيارة طارئة" : "تقرير زيارة صيانة دورية"} refNo={v.ref_no} meta={[
           ["العميل", v.customer && `${v.customer.name} (${v.customer.ref_no})`], ["الموقع", v.site && [v.site.name, v.site.city].filter(Boolean).join(" — ")],
           ["نوع الزيارة", visitType[v.visit_type] ?? null], ["سبب الزيارة", urgent && v.urgent_reason ? URGENT_REASONS[v.urgent_reason] : null],
-          ["أمر العمل", v.work_order && `${v.work_order.ref_no} — ${v.work_order.title}`], ["الموعد", formatDateTime(v.scheduled_start)],
+          ["الموعد", formatDateTime(v.scheduled_start)],
           ["بدء التنفيذ", v.actual_start && formatDateTime(v.actual_start)], ["انتهاء التنفيذ", v.actual_end && formatDateTime(v.actual_end)],
           ["الحالة", visitStatus[v.status]?.label], ["النتيجة", v.outcome ? visitOutcome[v.outcome]?.label : null], ["الفنيون", t.map((x) => x!.full_name).join("، ")],
           ["الأجهزة", useItems ? `${sum.total} · فُحص ${sum.inspected}${sum.skipped ? ` · تعذر/غير موجود ${sum.skipped}` : ""}${sum.pending ? ` · بلا نتيجة ${sum.pending}` : ""}${sum.fails ? ` · غير سليم ${sum.fails}` : ""}`

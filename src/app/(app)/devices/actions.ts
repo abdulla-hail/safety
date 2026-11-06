@@ -246,7 +246,6 @@ export async function addMaintenance(prev: ActionState, fd: FormData): Promise<A
   if (!ACTIONS.includes(action)) return fail(prev, fd, "اختر نوع العملية.", { action: "مطلوب" });
   if (!RESULTS.includes(result)) return fail(prev, fd, "اختر نتيجة الفحص.", { result: "مطلوب" });
   const visit = str(fd, "visit_id");
-  const wo = str(fd, "work_order_id");
   const performed = fromLocalInput(str(fd, "performed_at")) ?? new Date().toISOString();
   if (new Date(performed).getTime() > Date.now() + 5 * 60_000) return fail(prev, fd, "لا يمكن تسجيل صيانة بتاريخ مستقبلي.", { performed_at: "تاريخ مستقبلي" });
 
@@ -275,7 +274,6 @@ export async function addMaintenance(prev: ActionState, fd: FormData): Promise<A
     notes,
     next_due_at: strOrNull(fd, "next_due_at"),
     visit_id: isUuid(visit) ? visit : null,
-    work_order_id: isUuid(wo) ? wo : null,
   });
   const duplicate = error?.code === "23505" && /maintenance_records_pkey/.test(error.message ?? "");
   if (error && !duplicate) return fail(prev, fd, dbErrorMessage(error));

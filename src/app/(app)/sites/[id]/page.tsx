@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/list";
 import { formatDate } from "@/lib/format";
 import { deviceStatus } from "@/lib/labels";
+import MapView from "@/components/map/MapView";
+import { directionsUrl, mapUrl, validLatLng } from "@/lib/geo";
 
 export const metadata = { title: "بيانات الموقع | عين السلامة" };
 
@@ -24,6 +26,7 @@ export default async function SitePage({ params }: { params: Promise<{ id: strin
       .eq("company_id", ctx.orgId).eq("site_id", id).is("archived_at", null).order("ref_no").limit(200),
   ]);
   if (!s) notFound();
+  const pos = validLatLng(s.latitude, s.longitude);
 
   return (
     <div className="space-y-6">
@@ -33,17 +36,26 @@ export default async function SitePage({ params }: { params: Promise<{ id: strin
         actions={<>
           {ctx.can("devices.print") && (count ?? 0) > 0 && <Link href={`/print/labels?site=${id}&size=a4-6`} className={btnSecondary}>طباعة باركود أجهزة الموقع</Link>}
           {ctx.can("reports.print") && (count ?? 0) > 0 && <Link href={`/print/devices?site=${id}`} className={btnSecondary}>طباعة بيانات أجهزة الموقع</Link>}
-          {ctx.can("sites.update") && <Link href={`/sites/${id}/edit`} className={btnPrimary}>تعديل</Link>}
+          {ctx.canAny("visits.create", "field.assigned") && !s.archived_at && <Link href={`/visits/new?type=survey&customer=${s.customer_id}&site=${id}`} className={btnPrimary}>+ زيارة معاينة</Link>}
+          {ctx.can("sites.update") && <Link href={`/sites/${id}/edit`} className={btnSecondary}>تعديل</Link>}
           <RecordActions table="customer_sites" id={id} archived={!!s.archived_at} back={`/sites/${id}`} listPath="/sites" noun="الموقع"
             canArchive={ctx.can("sites.archive")} canDelete={ctx.can("sites.delete")} />
         </>} />
       <section className={card}>
-        <div className={cardHeader}><h2 className={cardTitle}>بيانات الموقع</h2></div>
+        <div className={cardHeader}><h2 className={cardTitle}>بيانات الفرع</h2>
+          {pos && <div className="flex flex-wrap gap-2">
+            <a href={directionsUrl(pos)} target="_blank" rel="noopener noreferrer" className={`${btnPrimary} ${btnSm}`}>الاتجاهات إلى الفرع</a>
+            <a href={mapUrl(pos)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>فتح في خرائط Google</a>
+          </div>}</div>
         <InfoGrid items={[
           ["العميل", s.customer && <Link href={`/customers/${s.customer.id}`} className={link}>{s.customer.name}</Link>],
           ["المدينة", s.city], ["الحي", s.district], ["العنوان", s.address],
-          ["المسؤول", s.contact_name], ["الهاتف", s.contact_phone && <span dir="ltr">{s.contact_phone}</span>], ["ملاحظات", s.notes],
+          ["المسؤول", s.contact_name], ["الهاتف", s.contact_phone && <a href={`tel:${s.contact_phone}`} dir="ltr" className={link}>{s.contact_phone}</a>], ["ملاحظات", s.notes],
         ]} />
+        <div className="border-t border-slate-100 p-5">
+          {pos ? <MapView markers={[{ ...pos, label: s.name, directions: directionsUrl(pos) }]} height={280} />
+            : <p className="text-sm text-slate-500">لم يُحدَّد موقع الفرع على الخريطة بعد.{ctx.can("sites.update") && <> <Link href={`/sites/${id}/edit`} className={link}>حدده الآن</Link></>}</p>}
+        </div>
       </section>
       <section className={card}>
         <div className={cardHeader}>

@@ -5,7 +5,6 @@ import PageHeader from "@/components/ui/PageHeader";
 import InfoGrid from "@/components/ui/InfoGrid";
 import StatusBadge from "@/components/ui/StatusBadge";
 import EntityForm from "@/components/ui/EntityForm";
-import ActionButton from "@/components/ui/ActionButton";
 import AttachmentList from "@/components/attachments/AttachmentList";
 import { btnPrimary, card, cardHeader, cardTitle, link } from "@/components/ui/styles";
 import { requireOrg } from "@/lib/auth/context";
@@ -15,7 +14,7 @@ import PhasePending from "@/components/PhasePending";
 import { isUuid } from "@/lib/list";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { deviceStatus, faultSeverity, faultSource, faultStatus } from "@/lib/labels";
-import { createWorkOrderForFault, transitionFault, updateFaultFollowUp } from "../actions";
+import { transitionFault, updateFaultFollowUp } from "../actions";
 
 export const metadata = { title: "بلاغ عطل | عين السلامة" };
 
@@ -35,7 +34,7 @@ export default async function FaultPage({ params }: { params: Promise<{ id: stri
   const supabase = await createClient();
   if (!(await hasPhase5(supabase))) return <PhasePending />;
   const inspections = await hasInspections(supabase);
-  const faultCols: string = "*, device:devices(id, name, ref_no, status), customer:customers(id, name), site:customer_sites(id, name), work_order:work_orders(id, ref_no, title, status)"
+  const faultCols: string = "*, device:devices(id, name, ref_no, status), customer:customers(id, name), site:customer_sites(id, name)"
     + (inspections ? ", assignee:technicians!df_assignee_fk(full_name), visit:visits!df_visit_fk(id, ref_no)" : "");
   const [{ data: raw }, events, techs] = await Promise.all([
     supabase.from("device_faults").select(faultCols).eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
@@ -48,7 +47,6 @@ export default async function FaultPage({ params }: { params: Promise<{ id: stri
     device_id: string; site_id: string | null; work_order_id: string | null; resolution: string | null; resolved_at: string | null;
     verification_result: string | null; verified_at: string | null;
     device: { id: string; name: string; ref_no: string; status: string } | null; customer: Ref; site: Ref;
-    work_order: { id: string; ref_no: string; title: string; status: string } | null;
   } | null;
   if (!f) notFound();
   const canManage = ctx.can("faults.update") && !f.archived_at;
@@ -58,10 +56,7 @@ export default async function FaultPage({ params }: { params: Promise<{ id: stri
     <div className="space-y-6">
       <PageHeader title={`بلاغ عطل — ${f.device?.name ?? ""}`} refNo={f.ref_no}
         crumbs={[{ label: "البلاغات والأعطال", href: "/faults" }, { label: f.ref_no ?? "بلاغ" }]}
-        actions={canManage && !f.work_order_id && ctx.can("work_orders.create") && !["closed", "cancelled"].includes(f.status)
-          ? <ActionButton action={createWorkOrderForFault} hidden={{ fault_id: id }} label="إنشاء أمر عمل للإصلاح" className={btnPrimary}
-              confirm="إنشاء أمر عمل مستقل لإصلاح هذا العطل؟ لن تُنشأ زيارة تلقائيًا ولن تتغير مواعيد الصيانة." />
-          : undefined} />
+/>
 
       <section className={card}>
         <div className={cardHeader}><h2 className={cardTitle}>بيانات البلاغ</h2><StatusBadge {...(faultStatus[f.status] ?? { label: f.status, tone: "neutral" })} /></div>
@@ -73,7 +68,6 @@ export default async function FaultPage({ params }: { params: Promise<{ id: stri
           ["الخطورة", <StatusBadge key="s" {...(faultSeverity[f.severity] ?? { label: f.severity, tone: "neutral" })} />],
           ["المصدر", faultSource[f.source] ?? f.source],
           ["تاريخ البلاغ", formatDateTime(f.reported_at)],
-          ["أمر العمل", f.work_order ? <Link href={`/work-orders/${f.work_order.id}`} className={link}>{f.work_order.ref_no} — {f.work_order.title}</Link> : "—"],
           ["الإصلاح", f.resolution], ["تاريخ الإصلاح", formatDateTime(f.resolved_at)],
           ["نتيجة التحقق", f.verification_result === "passed" ? "ناجح" : f.verification_result === "failed" ? "فاشل" : "—"],
           ["تاريخ التحقق", formatDateTime(f.verified_at)],

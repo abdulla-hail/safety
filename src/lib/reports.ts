@@ -8,7 +8,7 @@ import { addDaysISO, formatDate, formatDateTime, todayISO } from "@/lib/format";
 import {
   TECHNICIAN_SPECIALTIES, companyMemberStatus, companyRole, customerType, deviceStatus, faultSeverity, faultStatus, maintenanceAction,
   maintenanceKind, maintenanceResult, companyStatus, technicianAvailability, toOptions, visitOutcome, visitStatus, visitType,
-  workOrderPriority, workOrderStatus, workOrderType,
+
 } from "@/lib/labels";
 import { archiveScope, isUuid, orIlike, param, type SearchParams } from "@/lib/list";
 import { hasInspections, hasPhase5 } from "@/lib/schema";
@@ -416,44 +416,6 @@ export const REPORTS: ReportDef[] = [
     },
   },
   {
-    slug: "work-orders", title: "تقرير أوامر العمل", description: "أوامر العمل حسب الحالة والأولوية والفترة.",
-    needs: ["work_orders.view"], archiveFilter: true,
-    filters: async () => [
-      { name: "status", label: "الحالة", type: "select", options: toOptions(workOrderStatus) },
-      { name: "priority", label: "الأولوية", type: "select", options: toOptions(workOrderPriority) }, ...DATES,
-    ],
-    columns: [
-      { key: "ref", label: "الرقم", value: (r) => r.ref_no as string, href: (r) => `/work-orders/${r.id}` },
-      { key: "title", label: "العنوان", value: (r) => r.title as string },
-      { key: "type", label: "النوع", value: (r) => workOrderType[r.order_type as string] ?? "" },
-      { key: "customer", label: "العميل", value: (r) => rel(r, "customer") },
-      { key: "priority", label: "الأولوية", value: (r) => label(workOrderPriority, r.priority) },
-      { key: "status", label: "الحالة", value: (r) => label(workOrderStatus, r.status) },
-      { key: "created", label: "الإنشاء", value: (r) => formatDate(r.created_at as string) },
-      { key: "done", label: "الإكمال", value: (r) => formatDate(r.completed_at as string) },
-    ],
-    fetch: async ({ sb, orgId, sp, range }) => {
-      let q = sb.from("work_orders").select("id, ref_no, title, order_type, priority, status, created_at, completed_at, archived_at, customer:customers(name)", { count: "exact" })
-        .eq("company_id", orgId).order("created_at", { ascending: false });
-      q = scoped(q, sp);
-      for (const k of ["status", "priority"]) if (param(sp, k)) q = q.eq(k, param(sp, k));
-      if (isUuid(param(sp, "customer"))) q = q.eq("customer_id", param(sp, "customer"));
-      if (dateFrom(sp)) q = q.gte("created_at", dateFrom(sp)!);
-      if (dateTo(sp)) q = q.lte("created_at", dateTo(sp)!);
-      const s = orIlike(["ref_no", "title"], param(sp, "q"));
-      if (s) q = q.or(s);
-      return ranged(q, range);
-    },
-    summary: async ({ sb, orgId }) => {
-      const out: [string, number][] = [];
-      for (const st of ["new", "scheduled", "in_progress", "completed"]) {
-        const { count } = await sb.from("work_orders").select("id", { count: "exact", head: true }).eq("company_id", orgId).is("archived_at", null).eq("status", st);
-        out.push([workOrderStatus[st].label, count ?? 0]);
-      }
-      return out;
-    },
-  },
-  {
     slug: "faults", title: "تقرير البلاغات والأعطال", description: "الأعطال المفتوحة والإصلاحات التي تنتظر التحقق والمغلقة خلال فترة.",
     needs: ["faults.view"],
     filters: async () => [
@@ -468,12 +430,11 @@ export const REPORTS: ReportDef[] = [
       { key: "site", label: "الموقع", value: (r) => rel(r, "site") },
       { key: "severity", label: "الخطورة", value: (r) => label(faultSeverity, r.severity) },
       { key: "status", label: "الحالة", value: (r) => label(faultStatus, r.status) },
-      { key: "wo", label: "أمر العمل", value: (r) => rel(r, "work_order", "ref_no") },
       { key: "resolved", label: "تاريخ الإصلاح", value: (r) => formatDateTime(r.resolved_at as string) },
       { key: "verify", label: "التحقق", value: (r) => (r.verification_result === "passed" ? "ناجح" : r.verification_result === "failed" ? "فاشل" : "") },
     ],
     fetch: async ({ sb, orgId, sp, range }) => {
-      let q = sb.from("device_faults").select("id, ref_no, reported_at, device_id, severity, status, resolved_at, verification_result, device:devices(name), customer:customers(name), site:customer_sites(name), work_order:work_orders(ref_no)", { count: "exact" })
+      let q = sb.from("device_faults").select("id, ref_no, reported_at, device_id, severity, status, resolved_at, verification_result, device:devices(name), customer:customers(name), site:customer_sites(name)", { count: "exact" })
         .eq("company_id", orgId).is("archived_at", null).order("reported_at", { ascending: false });
       const st = param(sp, "status");
       if (st === "open_all") q = q.in("status", ["open", "in_progress", "awaiting_verification"]);
@@ -603,10 +564,10 @@ export const REPORTS: ReportDef[] = [
   },
   {
     slug: "archived", title: "تقرير السجلات المؤرشفة", description: "السجلات المؤرشفة لكل وحدة مع تاريخ الأرشفة.",
-    needs: ["customers.view", "devices.view", "technicians.view", "sites.view", "work_orders.view", "visits.view"],
+    needs: ["customers.view", "devices.view", "technicians.view", "sites.view", "visits.view"],
     filters: async () => [{ name: "entity", label: "الوحدة", type: "select", options: [
       { value: "customers", label: "العملاء" }, { value: "devices", label: "الأجهزة" }, { value: "technicians", label: "الفنيون" },
-      { value: "customer_sites", label: "المواقع" }, { value: "work_orders", label: "أوامر العمل" }, { value: "visits", label: "الزيارات" },
+      { value: "customer_sites", label: "الفروع والمواقع" }, { value: "visits", label: "الزيارات والمعاينات" },
     ] }],
     columns: [
       { key: "ref", label: "الرقم", value: (r) => r.ref_no as string, href: (r) => r.href as string },
@@ -616,7 +577,7 @@ export const REPORTS: ReportDef[] = [
     fetch: async ({ sb, orgId, sp, range }) => {
       const cfg: Record<string, [string, string, string]> = {
         customers: ["name", "/customers/", "customers"], devices: ["name", "/devices/", "devices"], technicians: ["full_name", "/technicians/", "technicians"],
-        customer_sites: ["name", "/sites/", "customer_sites"], work_orders: ["title", "/work-orders/", "work_orders"], visits: ["ref_no", "/visits/", "visits"],
+        customer_sites: ["name", "/sites/", "customer_sites"], visits: ["ref_no", "/visits/", "visits"],
       };
       const [col, path, table] = cfg[param(sp, "entity")] ?? cfg.customers;
       // اختيار ديناميكي للجدول (من قائمة ثابتة أعلاه)

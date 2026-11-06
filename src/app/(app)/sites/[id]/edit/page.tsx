@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/list";
 import { siteFields } from "../../../customers/fields";
 import { updateSite } from "../../actions";
+import LocationPicker from "@/components/map/LocationPicker";
+import { validLatLng } from "@/lib/geo";
 
 export const metadata = { title: "تعديل موقع | عين السلامة" };
 
@@ -19,9 +21,11 @@ export default async function EditSitePage({ params }: { params: Promise<{ id: s
   if (!s) notFound();
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title={`تعديل: ${s.name}`} refNo={s.ref_no} crumbs={[{ label: "المواقع", href: "/sites" }, { label: s.name, href: `/sites/${id}` }, { label: "تعديل" }]} />
+      <PageHeader title={`تعديل: ${s.name}`} refNo={s.ref_no} crumbs={[{ label: "العملاء", href: "/customers" }, { label: s.name, href: `/sites/${id}` }, { label: "تعديل" }]} />
       <section className={`${card} p-6`}>
-        <EntityForm action={updateSite} fields={[{ name: "id", label: "", type: "hidden" }, ...siteFields]} initial={s} cancelHref={`/sites/${id}`} />
+        <EntityForm action={updateSite} fields={[{ name: "id", label: "", type: "hidden" }, ...siteFields]} initial={s} cancelHref={`/sites/${id}`}>
+          <LocationPicker initial={validLatLng(s.latitude, s.longitude)} />
+        </EntityForm>
       </section>
     </div>
   );
