@@ -86,6 +86,7 @@ export default function BrandingForm({ v, logoUrl, stampUrl, canCompany, canBran
           <div>
             <label htmlFor="c-logo" className={label}>الشعار (PNG/JPEG/WebP/SVG حتى 2MB)</label>
             <input id="c-logo" type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { setLogoFile(e.target.files?.[0] ?? null); setRemoveLogo(false); }} className="text-sm" />
+            <p className="mt-1 text-xs text-slate-500">يصبح الشعار أيضًا أيقونة التطبيق عند تثبيت المنصة على الجوال أو الحاسب («تثبيت التطبيق» أعلى الصفحة). الأفضل شعار مربع واضح بخلفية فاتحة.</p>
             {logoUrl && (
               <label className="mt-2 flex items-center gap-2 text-xs"><input type="checkbox" name="remove_logo" checked={removeLogo} onChange={(e) => setRemoveLogo(e.target.checked)} /> إزالة الشعار الحالي</label>
             )}

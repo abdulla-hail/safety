@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Form from "next/form";
 import Icon from "@/components/ui/Icon";
+import InstallAppButton from "@/components/pwa/InstallAppButton";
 import { switchOrganization } from "@/app/(app)/actions";
 
 interface OrgOption {
@@ -42,6 +43,7 @@ export default function Topbar({
       )}
 
       <div className="ms-auto flex items-center gap-2 sm:gap-3">
+        <InstallAppButton companyName={tenantName} />
         {orgs.length > 1 && (
           <form action={switchOrganization} className="hidden md:block">
             <label htmlFor="org-switch" className="sr-only">الشركة</label>

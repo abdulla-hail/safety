@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export type IconName =
   | "dashboard" | "users" | "calendar" | "shield" | "shieldAlert" | "file" | "wrench" | "chart"
   | "settings" | "menu" | "bell" | "search" | "x" | "clipboard" | "clock" | "logOut" | "building"
-  | "mapPin" | "link" | "book" | "qr" | "printer" | "history" | "userCog" | "scan" | "plus" | "archive";
+  | "mapPin" | "link" | "book" | "qr" | "printer" | "history" | "userCog" | "scan" | "plus" | "archive" | "download";
 
 const PATHS: Record<IconName, ReactNode> = {
   dashboard: (<><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></>),
@@ -32,6 +32,7 @@ const PATHS: Record<IconName, ReactNode> = {
   userCog: (<><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4" /><circle cx="18" cy="18" r="3" /><path d="M18 13.5v1.5M18 21v1.5M22.5 18H21M15 18h-1.5" /></>),
   scan: (<><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" /><path d="M7 12h10" /></>),
   plus: <path d="M12 5v14M5 12h14" />,
+  download: (<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /><path d="M12 15V3" /></>),
   archive: (<><rect x="2" y="3" width="20" height="5" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" /></>),
 };
 
