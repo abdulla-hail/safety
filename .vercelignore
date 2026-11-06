@@ -1,0 +1,19 @@
+# قائمة سماح: يُستبعد كل شيء افتراضيًا، ولا يُرفع إلا ما يحتاجه بناء Next.js وتشغيله.
+# أي ملف جديد يظهر لاحقًا في جذر المشروع (نسخ احتياطية، ملفات أسرار، بيانات) يبقى مستبعدًا تلقائيًا.
+# المستبعد بذلك: .env.local و.env.migrate.local و.backups و.claude و.next و node_modules
+# و scripts و tests و supabase و docs وملفات Markdown و tsconfig.tsbuildinfo و next-env.d.ts (يُولَّد أثناء البناء).
+/*
+
+# الكود والأصول
+!/src
+!/public
+
+# الحزم (Vercel يثبّتها من ملف القفل بنفس الإصدارات)
+!/package.json
+!/package-lock.json
+
+# إعدادات البناء والتشغيل
+!/next.config.ts
+!/tsconfig.json
+!/eslint.config.mjs
+!/vercel.json

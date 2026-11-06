@@ -1,0 +1,203 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/* الهوية التفاعلية للمنصة: مصدر واحد للون #D98E04 ودرجاته              */
+/* ------------------------------------------------------------------ */
+:root {
+  --background: #f5f7fa;
+  --foreground: #1f2933;
+  --card: #ffffff;
+
+  /* لون المنصة التفاعلي (الأزرار والأيقونات والتحديد والتقدم) */
+  --brand: #d98e04;
+  --brand-hover: #c27e03;      /* تحويم */
+  --brand-active: #a86c02;     /* ضغط */
+  --brand-strong: #8f5c03;     /* نصوص وروابط على الأبيض (تباين ≈5.6:1) */
+  --brand-icon: #b87702;       /* أيقونات على الأبيض (تباين ≥3:1) */
+  --brand-soft: #fdf3e1;       /* خلفيات التحديد والتمييز */
+  --brand-muted: #f6dfb4;      /* حدود وتعطيل */
+  --on-brand: #1c1300;         /* نص فوق اللون (تباين ≈7:1؛ الأبيض فوقه ≈2.7:1 فقط) */
+  --brand-ring: rgb(217 142 4 / 0.4);
+
+  /* هوية الشركة (خلفية القائمة الجانبية ورأسها): تُستبدل بلون كل شركة ولا تتأثر بلون المنصة */
+  --company: #1e3a5f;
+  /* اسم قديم يبقى لتوافق أي استخدام سابق: يشير الآن إلى درجة النص التفاعلية */
+  --primary: var(--brand-strong);
+
+  --danger: #c0392b;
+  --success: #2e7d5b;
+  --warning: #d98e04;
+
+  /* الحركة: هادئة وقصيرة */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--brand-strong);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-active: var(--brand-active);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-icon: var(--brand-icon);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-muted: var(--brand-muted);
+  --color-on-brand: var(--on-brand);
+  --color-company: var(--company);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  --font-sans: var(--font-tajawal), system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* عناصر النماذج الأصلية (الخانات، الأزرار الدائرية، شريط التقدم) بلون المنصة */
+:where(input[type="checkbox"], input[type="radio"], input[type="range"], progress) {
+  accent-color: var(--brand);
+}
+::selection { background: var(--brand-muted); color: var(--on-brand); }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ */
+/* الحركة والتفاعل                                                     */
+/* ------------------------------------------------------------------ */
+@keyframes ays-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ays-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ays-pop { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes ays-slide-down { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes ays-spin { to { transform: rotate(360deg); } }
+@keyframes ays-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes ays-toast { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* دخول محتوى الصفحة: الأقسام تظهر تدريجيًا بترتيبها (حتى ستة أقسام ثم معًا) */
+.page-enter > * { animation: ays-fade-up var(--dur-slow) var(--ease-out) both; }
+.page-enter > *:nth-child(2) { animation-delay: 40ms; }
+.page-enter > *:nth-child(3) { animation-delay: 80ms; }
+.page-enter > *:nth-child(4) { animation-delay: 120ms; }
+.page-enter > *:nth-child(5) { animation-delay: 160ms; }
+.page-enter > *:nth-child(n + 6) { animation-delay: 200ms; }
+/* الصفحات التي تلف محتواها في عنصر واحد: يظهر أبناؤه تدريجيًا */
+.page-enter > .space-y-6 > * { animation: ays-fade-up var(--dur-slow) var(--ease-out) both; }
+.page-enter > .space-y-6 > *:nth-child(2) { animation-delay: 50ms; }
+.page-enter > .space-y-6 > *:nth-child(3) { animation-delay: 100ms; }
+.page-enter > .space-y-6 > *:nth-child(n + 4) { animation-delay: 150ms; }
+
+/* صفوف الجداول والقوائم تظهر بهدوء عند العرض (أول 12 بتدرج) */
+.rows-enter > * { animation: ays-fade-in var(--dur) var(--ease-out) both; }
+.rows-enter > *:nth-child(-n + 12) { animation-delay: calc(var(--i, 0) * 1ms); }
+.rows-enter > *:nth-child(2) { --i: 20; } .rows-enter > *:nth-child(3) { --i: 40; } .rows-enter > *:nth-child(4) { --i: 60; }
+.rows-enter > *:nth-child(5) { --i: 80; } .rows-enter > *:nth-child(6) { --i: 100; } .rows-enter > *:nth-child(7) { --i: 120; }
+.rows-enter > *:nth-child(8) { --i: 140; } .rows-enter > *:nth-child(9) { --i: 160; } .rows-enter > *:nth-child(n + 10) { --i: 180; }
+
+/* تمييز الصف المحدد بخانة اختيار */
+tr:has(> td input[type="checkbox"]:checked), li:has(input[type="checkbox"][name="ids"]:checked) {
+  background-color: var(--brand-soft);
+  transition: background-color var(--dur) var(--ease-out);
+}
+
+/* رسائل النتيجة (نجاح/خطأ) والإشعار العائم */
+p[role="alert"], p[role="status"], span[role="alert"], span[role="status"], div[role="status"].feedback { animation: ays-slide-down var(--dur) var(--ease-out) both; }
+.toast-enter { animation: ays-toast var(--dur-slow) var(--ease-out) both; }
+
+/* القوائم المنسدلة والأقسام القابلة للطي */
+details > summary { cursor: pointer; transition: color var(--dur-fast); }
+details > summary:hover { color: var(--brand-strong); }
+details[open] > :not(summary) { animation: ays-slide-down var(--dur) var(--ease-out) both; }
+.overlay-enter { animation: ays-fade-in var(--dur) var(--ease-out) both; }
+.pop-enter { animation: ays-pop var(--dur) var(--ease-out) both; }
+
+/* مؤشر انشغال للأزرار والنماذج أثناء الحفظ/الرفع/الجلب (يمنع النقر المتكرر لأن الزر معطّل) */
+button[aria-busy="true"], .btn-busy { position: relative; cursor: progress !important; }
+button[aria-busy="true"]::before {
+  content: ""; width: 1em; height: 1em; flex: none; border-radius: 9999px;
+  border: 2px solid currentColor; border-inline-end-color: transparent; opacity: 0.85;
+  animation: ays-spin 0.7s linear infinite;
+}
+form[aria-busy="true"] fieldset, form[aria-busy="true"] .busy-dim { opacity: 0.7; transition: opacity var(--dur); }
+.spinner { display: inline-block; width: 1em; height: 1em; border-radius: 9999px; border: 2px solid currentColor; border-inline-end-color: transparent; animation: ays-spin 0.7s linear infinite; }
+
+/* هيكل التحميل: وميض هادئ يعمل فقط أثناء التحميل */
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 40%, #e2e8f0 80%);
+  background-size: 200% 100%;
+  animation: ays-shimmer 1.4s ease-in-out infinite;
+}
+
+/* تفاعل الأيقونات داخل العناصر القابلة للنقر */
+.icon-hover svg { transition: transform var(--dur) var(--ease-out); }
+.icon-hover:hover svg { transform: translateY(-1px) scale(1.08); }
+.icon-hover:active svg { transform: scale(0.94); }
+
+/* احترام تفضيل تقليل الحركة: تُلغى الحركات والانتقالات تقريبًا */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+  }
+  button[aria-busy="true"]::before, .spinner { animation: none !important; border-inline-end-color: currentColor; opacity: 0.5; }
+}
+
+/* ------------------------------------------------------------------ */
+/* الطباعة                                                             */
+/* ------------------------------------------------------------------ */
+
+/* صفحة المستند في المعاينة */
+.print-doc {
+  background: #fff;
+  color: #111;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto 24px;
+  padding: 14mm 12mm;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.08);
+}
+/* إطار المستند: thead/tfoot يتكرران في كل صفحة مطبوعة (ترويسة وتذييل جاريان) */
+.print-doc table.doc-frame { width: 100%; border-collapse: collapse; font-size: inherit; }
+.print-doc table.doc-frame > thead > tr > td,
+.print-doc table.doc-frame > tfoot > tr > td,
+.print-doc table.doc-frame > tbody > tr > td { border: 0; padding: 0; background: none; }
+.print-doc table.doc-frame > thead { display: table-header-group; }
+.print-doc table.doc-frame > tfoot { display: table-footer-group; }
+.print-doc table.doc-frame > tbody > tr { break-inside: auto; page-break-inside: auto; }
+
+/* جداول المحتوى: حدود داكنة وعناوين عريضة تبقى واضحة دون طباعة الخلفيات أو بالأبيض والأسود */
+.print-doc .doc-body table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.print-doc .doc-body th { background: #f1f5f9; font-weight: 800; text-align: right; color: #000; }
+.print-doc .doc-body th, .print-doc .doc-body td { border: 1px solid #64748b; padding: 4px 6px; vertical-align: top; }
+.print-doc .doc-body thead { display: table-header-group; }
+.print-doc .doc-body thead th { border-bottom-width: 2px; }
+.print-doc .doc-body tr, .print-doc .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+.print-doc h2 { font-size: 13px; font-weight: 800; margin: 14px 0 6px; break-after: avoid; page-break-after: avoid; }
+.print-doc .doc-card { border: 1px solid #64748b; border-radius: 4px; padding: 8px; break-inside: avoid; page-break-inside: avoid; }
+
+@media print {
+  html, body { background: #fff !important; }
+  .no-print { display: none !important; }
+  /* لا حركة ولا ألوان تفاعلية في الطباعة؛ المستندات بهوية الشركة فقط */
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  tr:has(> td input[type="checkbox"]:checked) { background: none !important; }
+  .print-doc { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  a { color: inherit; text-decoration: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+@page doc {
+  size: A4;
+  margin: 10mm 10mm 14mm;
+  @bottom-center {
+    content: "صفحة " counter(page) " من " counter(pages);
+    font-size: 9px;
+    color: #334155;
+  }
+}
+.print-doc { page: doc; }

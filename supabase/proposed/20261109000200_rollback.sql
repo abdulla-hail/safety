@@ -1,0 +1,13 @@
+-- تراجع 20261109000200_fk_indexes: حذف الفهارس المضافة فقط (لا بيانات).
+drop index if exists public.attachments_company_idx, public.device_due_changes_company_idx, public.device_fault_events_company_idx,
+  public.device_maintenance_cycles_company_idx, public.maintenance_corrections_company_idx, public.notifications_company_idx,
+  public.technician_assignment_events_company_idx, public.technician_customer_sites_company_idx, public.technician_customers_company_idx,
+  public.visit_devices_company_idx, public.visits_site_idx, public.work_orders_site_idx, public.visit_devices_site_idx,
+  public.visit_devices_customer_idx, public.device_maintenance_cycles_site_idx, public.device_maintenance_cycles_customer_idx,
+  public.device_transfers_from_site_idx, public.device_transfers_to_site_idx, public.device_transfers_from_customer_idx,
+  public.device_transfers_to_customer_idx, public.maintenance_records_visit_idx, public.maintenance_records_work_order_idx,
+  public.maintenance_records_fault_idx, public.device_faults_visit_idx, public.device_faults_work_order_idx,
+  public.device_faults_assigned_technician_idx, public.visits_work_order_idx, public.visit_devices_fault_idx,
+  public.work_order_devices_device_idx, public.devices_replaced_by_idx, public.devices_system_idx, public.devices_catalog_item_idx,
+  public.maintenance_record_technicians_technician_idx, public.visit_devices_technician_idx,
+  public.visit_devices_follow_up_technician_idx, public.technicians_user_idx, public.company_invitations_membership_idx;
