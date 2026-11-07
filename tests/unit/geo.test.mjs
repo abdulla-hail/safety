@@ -20,3 +20,37 @@ test("روابط الاتجاهات", () => {
   assert.deepEqual(g.validLatLng("24.1234567", "46"), { lat: 24.123457, lng: 46 });
   assert.equal(g.validLatLng("", "46"), null);
 });
+
+test("الدرجات والدقائق والثواني والعشري بالاتجاه", () => {
+  assert.deepEqual(g.parseLocation(`24°44'12.8"N 46°50'06.9"E`), { lat: 24.736889, lng: 46.835250 });
+  assert.deepEqual(g.parseLocation("24°44′12.8″N 46°50′06.9″E"), { lat: 24.736889, lng: 46.835250 });
+  assert.deepEqual(g.parseLocation(`N 24°44'12.8" E 46°50'06.9"`), { lat: 24.736889, lng: 46.835250 });
+  assert.deepEqual(g.parseLocation(`33°51'31.0"S 151°12'51.0"E`), { lat: -33.858611, lng: 151.214167 });
+  assert.deepEqual(g.parseLocation("24.7368° N, 46.8352° E"), { lat: 24.7368, lng: 46.8352 });
+  assert.equal(g.parseLocation(`91°00'00"N 46°00'00"E`), null);
+});
+
+test("تصنيف المدخل دون رفض أي صيغة", () => {
+  assert.equal(g.classifyLocation("https://maps.app.goo.gl/DQnp2ja91HvUZC3A6?g_st=aw"), "short_link");
+  assert.equal(g.classifyLocation(`24°44'12.8"N 46°50'06.9"E`), "coordinates");
+  assert.equal(g.classifyLocation("8056-7958 الهفوف، النسيم الشرقي، الرياض 14243"), "address");
+  assert.equal(g.classifyLocation("https://www.google.com/maps/place/Riyadh"), "map_link");
+  assert.equal(g.classifyLocation("https://example.com/x"), "link");
+  assert.equal(g.classifyLocation("  "), "empty");
+  assert.equal(g.classifyLocation("100% خطأ %E0%A4%A"), "address");
+  assert.equal(g.isShortMapsUrl("https://maps.app.goo.gl/abc"), true);
+  assert.equal(g.isShortMapsUrl("https://goo.gl/maps/abc"), true);
+  assert.equal(g.isShortMapsUrl("https://goo.gl/other"), false);
+});
+
+test("فتح الموقع: الإحداثيات ثم النص كما هو ثم البحث بالعنوان", () => {
+  assert.equal(g.locationHref({ latitude: 24.1, longitude: 46.2, location_text: "أي نص" }), "https://www.google.com/maps/search/?api=1&query=24.1,46.2");
+  assert.equal(g.locationHref({ location_text: `24°44'12.8"N 46°50'06.9"E` }), "https://www.google.com/maps/search/?api=1&query=24.736889,46.83525");
+  assert.equal(g.locationHref({ location_text: "https://maps.app.goo.gl/DQnp2ja91HvUZC3A6?g_st=aw" }), "https://maps.app.goo.gl/DQnp2ja91HvUZC3A6?g_st=aw");
+  const addr = "8056-7958 الهفوف، النسيم الشرقي، الرياض 14243";
+  assert.equal(g.locationHref({ location_text: addr }), `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`);
+  assert.equal(g.locationHref({ location_text: "javascript:alert(1)" }), null);
+  assert.equal(g.locationHref({ address: "شارع الملك فهد", city: "الرياض" }), `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("شارع الملك فهد، الرياض")}`);
+  assert.equal(g.locationHref({}), null);
+  assert.equal(g.directionsHref({ location_text: addr }), `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`);
+});

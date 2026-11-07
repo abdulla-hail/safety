@@ -24,7 +24,7 @@ export default async function EditSitePage({ params }: { params: Promise<{ id: s
       <PageHeader title={`تعديل: ${s.name}`} refNo={s.ref_no} crumbs={[{ label: "العملاء", href: "/customers" }, { label: s.name, href: `/sites/${id}` }, { label: "تعديل" }]} />
       <section className={`${card} p-6`}>
         <EntityForm action={updateSite} fields={[{ name: "id", label: "", type: "hidden" }, ...siteFields]} initial={s} cancelHref={`/sites/${id}`}>
-          <LocationPicker initial={validLatLng(s.latitude, s.longitude)} />
+          <LocationPicker initial={validLatLng(s.latitude, s.longitude)} initialText={(s as { location_text?: string | null }).location_text ?? null} />
         </EntityForm>
       </section>
     </div>

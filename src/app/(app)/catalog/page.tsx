@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { archiveScope, type SearchParams } from "@/lib/list";
 import { createSystem } from "./actions";
 import { systemFields } from "./fields";
+import CatalogTabs from "./CatalogTabs";
 
 export const metadata = { title: "كتالوج أجهزة السلامة | عين السلامة" };
 
@@ -36,6 +37,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             ))}
           </div>
         } />
+      <CatalogTabs current="systems" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {((data ?? []) as unknown as Sys[]).map((s) => (
           <Link key={s.id} href={`/catalog/${s.id}`} className={`${card} block p-5 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-md active:translate-y-0`}>

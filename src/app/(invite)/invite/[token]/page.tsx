@@ -73,7 +73,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
       <dl className="mt-6 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm sm:grid-cols-2">
         {p.full_name && <Item k="الاسم في الدعوة" v={p.full_name} />}
-        <Item k="الدور الوظيفي" v={companyRole[p.role ?? ""] ?? p.role ?? ""} />
+        <Item k="الدور الوظيفي" v={companyRole[p.role ?? ""] ?? "عضو"} />
         {p.job_title && <Item k="المسمى" v={p.job_title} />}
         {specialties.length > 0 && <Item k="التخصصات" v={specialties.join("، ")} />}
         <Item k="البريد المدعو" v={<span dir="ltr">{p.email_hint}</span>} />

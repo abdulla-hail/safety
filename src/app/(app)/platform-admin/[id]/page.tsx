@@ -8,7 +8,7 @@ import InvitationRowActions from "@/components/InvitationRowActions";
 import { card, cardHeader, cardTitle } from "@/components/ui/styles";
 import { requirePlatform } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { companyAuditAction, companyInvitationKind, companyMemberStatus, companyRole, companyStatus, invitationStatus } from "@/lib/labels";
+import { companyAuditAction, companyInvitationKind, companyMemberStatus, companyRole, roleLabel, companyStatus, invitationStatus } from "@/lib/labels";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { isUuid } from "@/lib/list";
 import { effectiveInvitationStatus, isMissingSchema } from "@/lib/invitations";
@@ -160,7 +160,7 @@ export default async function CompanyAdminPage({ params }: { params: Promise<{ i
           {list.map((m) => (
             <li key={String(m.id)} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
               <div>
-                <p className="font-semibold">{s(m, "full_name") ?? "—"} · {companyRole[String(m.role)] ?? String(m.role)}{m.is_primary === true ? " (المدير الأساسي)" : ""}</p>
+                <p className="font-semibold">{s(m, "full_name") ?? "—"} · {roleLabel(String(m.role), m.is_primary === true)}{m.is_primary === true ? " (المدير الأساسي)" : ""}</p>
                 <p className="text-xs text-slate-500"><span dir="ltr">{s(m, "email") ?? String(m.user_id).slice(0, 8) + "…"}</span>
                   {s(m, "job_title") && ` · ${s(m, "job_title")}`} · انضم {formatDate(s(m, "created_at"))}
                   {s(m, "removed_at") && ` · أُزيل ${formatDate(s(m, "removed_at"))}`}

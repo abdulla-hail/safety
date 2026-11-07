@@ -45,3 +45,17 @@ export async function hasWorkOrderExecution(supabase: SupabaseClient): Promise<b
 export function hasInspections(supabase: SupabaseClient): Promise<boolean> {
   return tableExists(supabase, "visit_devices");
 }
+
+/** م8 (20261112000100): نص موقع الفرع كما أدخله المستخدم (customer_sites.location_text) */
+export async function hasLocationText(supabase: SupabaseClient): Promise<boolean> {
+  const k = known.get("site-location-text");
+  if (fresh(k)) return k!.value;
+  const { error, status } = await supabase.from("customer_sites").select("location_text").limit(0);
+  if (!error && status >= 200 && status < 300) known.set("site-location-text", { at: Date.now(), value: true });
+  else if (error?.code === "42703" || error?.code === "PGRST204") known.set("site-location-text", { at: Date.now(), value: false });
+  else console.error("schema check for site location text failed:", status, error?.code ?? "", error?.message ?? "");
+  return known.get("site-location-text")?.value ?? false;
+}
+
+/** أعمدة الفرع مع نص الموقع إن كان الترحيل مطبّقًا */
+export const withLocationText = (cols: string, has: boolean) => (has ? `${cols}, location_text` : cols);

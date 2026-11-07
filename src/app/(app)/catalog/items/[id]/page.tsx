@@ -6,7 +6,8 @@ import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/list";
 import { updateItem } from "../../actions";
-import { itemFields } from "../../fields";
+import { itemFields, withBrandSuggestions } from "../../fields";
+import { brandNames } from "@/lib/brands";
 
 export const metadata = { title: "تعديل تعريف جهاز | عين السلامة" };
 
@@ -15,7 +16,10 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
   const ctx = await requireOrg("catalog.manage");
   if (!isUuid(id)) notFound();
   const supabase = await createClient();
-  const { data: i } = await supabase.from("catalog_items").select("*, system:safety_systems(id, name)").eq("id", id).eq("company_id", ctx.orgId).maybeSingle();
+  const [{ data: i }, brands] = await Promise.all([
+    supabase.from("catalog_items").select("*, system:safety_systems(id, name)").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
+    brandNames(supabase, ctx.orgId),
+  ]);
   if (!i) notFound();
   const specs = Object.entries((i.specs ?? {}) as Record<string, string>).map(([k, v]) => `${k}: ${v}`).join("\n");
   return (
@@ -24,7 +28,7 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
         crumbs={[{ label: "الكتالوج", href: "/catalog" }, { label: i.system?.name ?? "—", href: `/catalog/${i.system_id}` }, { label: i.name }]}
         description="التعديل يؤثر على الأجهزة التي ستُسجل لاحقًا فقط؛ الأجهزة القائمة تحتفظ ببياناتها كما سُجلت." />
       <section className={`${card} p-6`}>
-        <EntityForm action={updateItem} fields={[{ name: "id", label: "", type: "hidden" }, ...itemFields]}
+        <EntityForm action={updateItem} fields={[{ name: "id", label: "", type: "hidden" }, ...withBrandSuggestions(itemFields, brands)]}
           initial={{ ...i, specs, is_active: String(i.is_active) }} cancelHref={`/catalog/${i.system_id}`} />
       </section>
     </div>

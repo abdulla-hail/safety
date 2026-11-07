@@ -1,10 +1,13 @@
 /**
  * كتالوج الصلاحيات التفصيلية (مطابق لجدول permission_definitions في قاعدة البيانات cgwn).
- * إدارة الأعضاء والدعوات ليست صلاحية قابلة للمنح: هي لمدير الشركة فقط (تفرضها دوال قاعدة البيانات).
+ * الدوران: مدير (company_manager) وفني (technician). المدير الأساسي يملك كل الصلاحيات دائمًا؛ المديرون الآخرون كل الصلاحيات
+ * افتراضيًا أو ما يحدده لهم المدير الأساسي. إدارة الفريق صلاحية team.manage (للمديرين)، وإدارة المديرين للمدير الأساسي وحده.
+ * صلاحيات الإدارة (MANAGEMENT_PERMISSIONS) لا تُحسب للفني أبدًا (تفرضها قاعدة البيانات).
  * الواجهة تستخدمه لإظهار/إخفاء العناصر فقط؛ التحقق الفعلي في الخادم وRLS.
  */
 
 export const PERMISSION_MODULES = [
+  { key: "team", label: "الفريق والدعوات" },
   { key: "customers", label: "العملاء" },
   { key: "sites", label: "مواقع العملاء" },
   { key: "technicians", label: "الفنيون" },
@@ -22,6 +25,7 @@ export const PERMISSION_MODULES = [
 ] as const;
 
 export const PERMISSIONS = [
+  ["team.manage", "إدارة الفريق والدعوات (الفنيون)"],
   ["customers.view", "عرض جميع العملاء"],
   ["customers.create", "إضافة عميل"],
   ["customers.update", "تعديل عميل"],
@@ -88,35 +92,20 @@ export function permissionsByModule(available?: readonly string[]) {
   }));
 }
 
-/** أدوار وظيفية وصفية: تُستخدم كقوالب جاهزة لاختيار الصلاحيات، ولا تمنح صلاحية بذاتها. */
+/** صلاحيات إدارة الشركة والفريق: للمديرين فقط، ولا تظهر في صلاحيات الفني */
+export const MANAGEMENT_PERMISSIONS: readonly string[] = ["team.manage", "settings.branding", "audit.view"];
+
+/** الدوران الوحيدان في الشركة */
 export const JOB_ROLES = [
-  { key: "manager", label: "مدير الشركة" },
-  { key: "supervisor", label: "مشرف" },
+  { key: "manager", label: "مدير" },
   { key: "technician", label: "فني" },
-  { key: "accountant", label: "محاسب" },
-  { key: "storekeeper", label: "أمين مستودع" },
-  { key: "viewer", label: "مستخدم اطلاع" },
 ] as const;
 
-export const JOB_ROLE_LABELS: Record<string, string> = Object.fromEntries(JOB_ROLES.map((r) => [r.key, r.label]));
+/** تسميات للعرض؛ أدوار قديمة (إن وُجدت في سجلات سابقة) تظهر بتسمية عامة دون أن تكون خيارًا */
+export const JOB_ROLE_LABELS: Record<string, string> = { manager: "مدير", technician: "فني", supervisor: "عضو", accountant: "عضو", storekeeper: "عضو", viewer: "عضو" };
 
-const VIEW_ALL: Permission[] = [
-  "customers.view", "sites.view", "technicians.view", "catalog.view", "devices.view",
-  "visits.view", "maintenance.view",
-];
-
+/** القالب الافتراضي لكل دور (المرجع الفعلي في قاعدة البيانات: company_effective_permissions) */
 export const ROLE_PRESETS: Record<string, Permission[]> = {
   manager: ALL_PERMISSIONS.filter((p) => p !== "field.assigned"),
-  supervisor: [
-    ...VIEW_ALL,
-    "customers.create", "customers.update", "sites.create", "sites.update",
-    "assignments.manage", "devices.create", "devices.update", "devices.print",
-    "visits.create", "visits.update", "maintenance.create",
-    "faults.view", "faults.create", "faults.update", "visits.close_exception", "maintenance.reschedule", "quotes.view", "quotes.manage", "quotes.create",
-    "reports.view", "reports.print", "reports.export",
-  ],
   technician: ["field.assigned", "catalog.view", "maintenance.create", "devices.print", "visits.update", "faults.create", "quotes.create"],
-  accountant: [...VIEW_ALL, "faults.view", "quotes.view", "reports.view", "reports.export", "reports.print"],
-  storekeeper: ["catalog.view", "catalog.manage", "devices.view", "reports.view"],
-  viewer: [...VIEW_ALL, "reports.view"],
 };

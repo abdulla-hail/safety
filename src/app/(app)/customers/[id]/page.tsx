@@ -15,7 +15,8 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { customerType, deviceStatus, maintenanceResult, quoteStatus, visitStatus, visitType } from "@/lib/labels";
 import MapView from "@/components/map/MapView";
 import LocationPicker from "@/components/map/LocationPicker";
-import { directionsUrl, mapUrl, validLatLng } from "@/lib/geo";
+import { classifyLocation, directionsHref, directionsUrl, LOCATION_KIND_LABEL, locationHref, validLatLng } from "@/lib/geo";
+import { hasLocationText, withLocationText } from "@/lib/schema";
 import { assignTechniciansToCustomer, setAssignmentScope, setPrimaryTechnician, unassign } from "../actions";
 import { createSite } from "../../sites/actions";
 import { setCustomerSchedule } from "../../devices/actions";
@@ -34,9 +35,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
   // كل الاستعلامات تعتمد على المعرّف فقط، فتُنفذ معًا في جولة واحدة (RLS يقيّد كلًا منها)
   const canAssign = ctx.can("assignments.manage");
+  const hasText = await hasLocationText(supabase);
   const [{ data: c }, sites, devices, assigned, techs, quotes, visits, records, events] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).eq("company_id", org).maybeSingle(),
-    supabase.from("customer_sites").select("id, ref_no, name, city, district, address, contact_name, contact_phone, latitude, longitude, archived_at").eq("customer_id", id).order("name"),
+    supabase.from("customer_sites").select(withLocationText("id, ref_no, name, city, district, address, contact_name, contact_phone, latitude, longitude, archived_at", hasText)).eq("customer_id", id).order("name"),
     supabase.from("devices").select("id, ref_no, name, status, next_maintenance_at, site_id", { count: "exact" })
       .eq("customer_id", id).is("archived_at", null).order("next_maintenance_at", { nullsFirst: false }).limit(DEVICE_LIMIT),
     supabase.from("technician_customers").select("is_primary, sites:technician_customer_sites(site_id), technician:technicians(id, ref_no, full_name, phone)").eq("customer_id", id),
@@ -48,14 +50,17 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       .eq("customer_id", id).order("occurred_at", { ascending: false }).limit(20) : null,
   ]);
   if (!c) notFound();
+  type SiteRow = { id: string; ref_no: string; name: string; city: string | null; district: string | null; address: string | null; contact_name: string | null;
+    contact_phone: string | null; latitude: number | null; longitude: number | null; archived_at: string | null; location_text?: string | null };
+  const siteRows = (sites.data ?? []) as unknown as SiteRow[];
 
   type Tech = { id: string; ref_no: string; full_name: string; phone: string | null; isPrimary: boolean; siteIds: string[] };
   type Row = { is_primary: boolean; sites: { site_id: string }[] | null; technician: Omit<Tech, "isPrimary" | "siteIds"> | null };
   const assignedTechs: Tech[] = ((assigned.data ?? []) as unknown as Row[]).filter((r) => r.technician)
     .map((r) => ({ ...r.technician!, isPrimary: r.is_primary, siteIds: (r.sites ?? []).map((s) => s.site_id) }))
     .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
-  const siteName = new Map((sites.data ?? []).map((s) => [s.id, s.name]));
-  const activeSites = (sites.data ?? []).filter((s) => !s.archived_at);
+  const siteName = new Map(siteRows.map((s) => [s.id, s.name]));
+  const activeSites = siteRows.filter((s) => !s.archived_at);
   const mapped = activeSites.flatMap((s) => { const p = validLatLng(s.latitude, s.longitude); return p ? [{ ...p, label: s.name, href: `/sites/${s.id}`, directions: directionsUrl(p) }] : []; });
   const canSurvey = ctx.canAny("visits.create", "field.assigned") && !c.archived_at;
   type Ev = { id: string; event: string; reason: string | null; occurred_at: string; site_id: string | null; technician: { full_name: string } | null };
@@ -67,7 +72,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   // أجهزة العميل مجمعة حسب مواقعه (بترتيب المواقع)، والأجهزة القديمة بلا موقع في مجموعة مستقلة للمعالجة
   const devList = (devices.data ?? []) as unknown as Dev[];
   const groups = [
-    ...(sites.data ?? []).map((s) => ({ key: s.id, title: s.name, href: `/sites/${s.id}`, archived: !!s.archived_at, items: devList.filter((d) => d.site_id === s.id) })),
+    ...siteRows.map((s) => ({ key: s.id, title: s.name, href: `/sites/${s.id}`, archived: !!s.archived_at, items: devList.filter((d) => d.site_id === s.id) })),
     { key: "none", title: "بلا موقع — تحتاج ربطًا بموقعها الصحيح", href: null, archived: false, items: devList.filter((d) => !d.site_id) },
   ].filter((g) => g.items.length > 0);
 
@@ -77,6 +82,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         crumbs={[{ label: "العملاء", href: "/customers" }, { label: c.name }]}
         description={c.archived_at ? `مؤرشف منذ ${formatDate(c.archived_at)}` : undefined}
         actions={<>
+          {ctx.can("reports.print") && <Link href={`/print/customer/${id}/branches`} className={btnSecondary}>طباعة بيانات العميل وفروعه</Link>}
           {ctx.can("reports.print") && <Link href={`/print/customer/${id}`} className={btnSecondary}>طباعة تقرير العميل</Link>}
           {ctx.can("devices.print") && (devices.count ?? 0) > 0 && <Link href={`/print/labels?customer=${id}&size=a4-6`} className={btnSecondary}>طباعة باركود الأجهزة</Link>}
           {ctx.can("reports.print") && (devices.count ?? 0) > 0 && <Link href={`/print/devices?customer=${id}`} className={btnSecondary}>طباعة بيانات الأجهزة</Link>}
@@ -113,8 +119,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </div>
         <div className="grid gap-4 p-5 lg:grid-cols-[1fr_1.2fr]">
           <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-            {(sites.data ?? []).map((s) => {
-              const p = validLatLng(s.latitude, s.longitude);
+            {siteRows.map((s) => {
+              const open = locationHref(s), dir = directionsHref(s);
               return (
                 <li key={s.id} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3 text-sm">
                   <div className="min-w-0">
@@ -122,17 +128,18 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     {s.archived_at && <span className="ms-2 rounded bg-slate-200 px-1.5 text-[10px]">مؤرشف</span>}
                     <p className="text-xs text-slate-500">{[s.city, s.district, s.address].filter(Boolean).join(" · ") || "—"}</p>
                     {(s.contact_name || s.contact_phone) && <p className="text-xs text-slate-500">{s.contact_name ?? ""} {s.contact_phone && <a href={`tel:${s.contact_phone}`} dir="ltr" className="underline">{s.contact_phone}</a>}</p>}
+                    {s.location_text && <p className="break-all text-xs text-slate-500" dir="auto">📍 {s.location_text} <span className="rounded bg-slate-100 px-1 text-[10px]">{LOCATION_KIND_LABEL[classifyLocation(s.location_text)]}</span></p>}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {p ? <><a href={mapUrl(p)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>📍 الموقع</a><a href={directionsUrl(p)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>الاتجاهات</a></>
-                      : <span className="text-[11px] text-amber-700">بلا موقع على الخريطة</span>}
+                    {open ? <><a href={open} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>📍 الموقع</a>{dir && <a href={dir} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>الاتجاهات</a>}</>
+                      : <span className="text-[11px] text-amber-700">بلا موقع</span>}
                     {ctx.can("sites.update") && !s.archived_at && <Link href={`/sites/${s.id}/edit`} className={`${btnSecondary} ${btnSm}`}>تعديل الفرع والموقع</Link>}
                     {canSurvey && !s.archived_at && <Link href={`/visits/new?type=survey&customer=${id}&site=${s.id}`} className={`${btnSecondary} ${btnSm}`}>معاينة</Link>}
                   </div>
                 </li>
               );
             })}
-            {(sites.data ?? []).length === 0 && <li className="px-4 py-4 text-sm text-slate-500">لا توجد فروع بعد. أضف أول فرع وحدد موقعه على الخريطة.</li>}
+            {siteRows.length === 0 && <li className="px-4 py-4 text-sm text-slate-500">لا توجد فروع بعد. أضف أول فرع وحدد موقعه على الخريطة.</li>}
           </ul>
           {mapped.length > 0 ? <MapView markers={mapped} height={320} />
             : <p className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">حدد مواقع الفروع على الخريطة لتظهر هنا مع الاتجاهات إليها.</p>}

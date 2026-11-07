@@ -18,8 +18,10 @@ type Values = Record<string, string | number | null | undefined>;
  * والموديل والنوع ودورة الصيانة تلقائيًا، مع إمكانية التعديل قبل الحفظ.
  */
 export default function DeviceForm({
-  action, mode, customer, sites, systems, items, initial = {}, cancelHref, currentImageUrl = null, defaultMonths = 3, statusKeys, clientId, dueLocked = false,
+  action, mode, customer, sites, systems, items, initial = {}, cancelHref, currentImageUrl = null, defaultMonths = 3, statusKeys, clientId, dueLocked = false, brands = [],
 }: {
+  /** ماركات الكتالوج: تُقترح في «الشركة المصنعة» (ويُقبل غيرها) */
+  brands?: string[];
   /** بعد ترحيل 20261106000100: الموعد القادم لا يُعدَّل من نموذج التعديل، بل بإجراء «تعديل الموعد» الموثق في صفحة الجهاز */
   dueLocked?: boolean;
   /** الحالات المقبولة في القاعدة الحالية (افتراضيًا كل الحالات المعرّفة) */
@@ -127,7 +129,8 @@ export default function DeviceForm({
         </div>
         {field("name", "اسم الجهاز *", { required: true, maxLength: 200 })}
         {field("device_type", "النوع")}
-        {field("manufacturer", "الشركة المصنعة")}
+        {field("manufacturer", "الشركة المصنعة", brands.length ? { list: "d-brands" } : {})}
+        {brands.length > 0 && <datalist id="d-brands">{brands.map((b) => <option key={b} value={b} />)}</datalist>}
         {field("model", "الموديل", { dir: "ltr" })}
       </fieldset>
 

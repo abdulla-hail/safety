@@ -24,7 +24,7 @@ export default async function TechnicianPage({ params, searchParams }: { params:
   const [{ data: t }, visits, audit] = await Promise.all([
     supabase.from("technicians").select("*").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
     supabase.from("visit_technicians").select("visit:visits(id, ref_no, scheduled_start, status, customer:customers(name))").eq("technician_id", id).order("created_at", { ascending: false }).limit(8),
-    ctx.active.is_owner
+    ctx.active.can_manage_team
       ? supabase.from("company_audit_log").select("id, action, target_type, details, created_at").eq("company_id", ctx.orgId)
           .or(`target_id.eq.${id},details->>technician_id.eq.${id}`).order("created_at", { ascending: false }).limit(10)
       : null,
@@ -35,7 +35,7 @@ export default async function TechnicianPage({ params, searchParams }: { params:
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t.full_name} refNo={t.ref_no} crumbs={[ctx.active.is_owner ? { label: "فريق الشركة", href: "/team" } : { label: "إسناد الفنيين", href: "/assignments" }, { label: t.full_name }]}
+      <PageHeader title={t.full_name} refNo={t.ref_no} crumbs={[ctx.active.can_manage_team ? { label: "فريق الشركة", href: "/team" } : { label: "إسناد الفنيين", href: "/assignments" }, { label: t.full_name }]}
         description={t.archived_at ? `مؤرشف منذ ${formatDate(t.archived_at)}` : undefined}
         actions={<>
           {ctx.can("technicians.update") && <Link href={`/technicians/${id}/edit`} className={btnPrimary}>تعديل</Link>}

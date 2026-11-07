@@ -20,10 +20,10 @@ function describe(details: Record<string, unknown> | null): string {
   return keys.slice(0, 6).join("، ") + (keys.length > 6 ? ` (+${keys.length - 6})` : "");
 }
 
-/** سجل تدقيق الشركة (company_audit_log): متاح لمدير الشركة فقط وفق سياسة RLS، ولا يُعدّل ولا يُحذف. */
+/** سجل تدقيق الشركة (company_audit_log): للمدير الأساسي ولمن يملك audit.view من المديرين وفق سياسة RLS، ولا يُعدّل ولا يُحذف. */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireOrg();
-  if (!ctx.active.is_owner) redirect("/forbidden");
+  if (!ctx.active.is_primary && !ctx.can("audit.view")) redirect("/forbidden");
   const sp = await searchParams;
   const page = pageOf(sp);
   const supabase = await createClient();

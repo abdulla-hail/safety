@@ -146,13 +146,14 @@ export const companyStatus: LabelMap = {
 };
 
 /** أدوار جدول company_memberships */
+/** الدوران المعروضان في الفريق والدعوات */
 export const companyRole: Record<string, string> = {
-  company_manager: "مدير الشركة",
-  supervisor: "مشرف",
+  company_manager: "مدير",
   technician: "فني",
-  accountant: "محاسب",
-  storekeeper: "أمين مستودع",
 };
+/** تسمية دور عضوية (يشمل أدوارًا قديمة في سجلات سابقة دون عرضها خيارًا) */
+export const roleLabel = (role: string, isPrimary = false) =>
+  isPrimary ? "المدير الأساسي" : companyRole[role] ?? "عضو";
 
 export const companyMemberStatus: LabelMap = {
   active: { label: "نشط", tone: "success" },

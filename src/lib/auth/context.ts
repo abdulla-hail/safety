@@ -20,8 +20,10 @@ export interface Membership {
   member_status: string;
   role: string;
   is_primary: boolean;
-  /** مدير الشركة (company_manager) */
+  /** مدير في الشركة (company_manager): المدير الأساسي أو مدير إضافي */
   is_owner: boolean;
+  /** يدير الفريق والدعوات (team.manage؛ الفنيون للمديرين، والمديرون للمدير الأساسي فقط) */
+  can_manage_team: boolean;
   job_roles: string[];
   expires_at: string | null;
   is_expired: boolean;
@@ -196,6 +198,8 @@ const loadContext = cache(async (_generation: number): Promise<AppContext | null
     role: r.role,
     is_primary: r.is_primary === true,
     is_owner: r.role === "company_manager",
+    // المدير الأساسي دائمًا (وقبل ترحيل 20261112000100 لا توجد team.manage، وكل المديرين أساسيون)
+    can_manage_team: r.role === "company_manager" && (r.is_primary === true || (r.permissions ?? []).includes("team.manage")),
     job_roles: [ROLE_KEY[r.role] ?? r.role],
     expires_at: null,
     is_expired: false,

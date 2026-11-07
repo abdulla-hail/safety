@@ -16,7 +16,8 @@ export function rpcErrorMessage(error: { code?: string; message?: string } | nul
   return isMissingSchema(error) ? SCHEMA_PENDING_MESSAGE : dbErrorMessage(error);
 }
 
-export const INVITE_ROLES = ["supervisor", "technician", "accountant", "storekeeper"] as const;
+/** الدوران المتاحان للدعوة وتغيير الدور: مدير (للمدير الأساسي فقط) أو فني */
+export const INVITE_ROLES = ["company_manager", "technician"] as const;
 
 /** يبني رابط الدعوة من الرمز الخام الذي تعيده قاعدة البيانات مرة واحدة. */
 export async function inviteLink(token: string) {

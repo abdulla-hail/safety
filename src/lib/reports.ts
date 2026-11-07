@@ -6,7 +6,7 @@ import type { Permission } from "@/lib/permissions";
 import { PERMISSION_LABELS } from "@/lib/permissions";
 import { addDaysISO, formatDate, formatDateTime, todayISO } from "@/lib/format";
 import {
-  TECHNICIAN_SPECIALTIES, companyMemberStatus, companyRole, customerType, deviceStatus, faultSeverity, faultStatus, maintenanceAction,
+  TECHNICIAN_SPECIALTIES, companyMemberStatus, roleLabel, customerType, deviceStatus, faultSeverity, faultStatus, maintenanceAction,
   maintenanceKind, maintenanceResult, companyStatus, technicianAvailability, toOptions, visitOutcome, visitStatus, visitType,
 
 } from "@/lib/labels";
@@ -547,7 +547,7 @@ export const REPORTS: ReportDef[] = [
     columns: [
       { key: "name", label: "الاسم", value: (r) => (r.full_name as string) ?? "" },
       { key: "email", label: "البريد", value: (r) => (r.email as string) ?? "" },
-      { key: "role", label: "الدور", value: (r) => (companyRole[r.role as string] ?? String(r.role)) + (r.is_primary ? " (أساسي)" : "") },
+      { key: "role", label: "الدور", value: (r) => (roleLabel(String(r.role), r.is_primary === true)) },
       { key: "status", label: "الحالة", value: (r) => label(companyMemberStatus, r.status) },
       { key: "since", label: "الانضمام", value: (r) => formatDate(r.created_at as string) },
       { key: "perms", label: "الصلاحيات", value: (r) => (r.role === "company_manager" ? "كل صلاحيات الشركة"

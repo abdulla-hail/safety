@@ -9,12 +9,13 @@ import { createClient } from "@/lib/supabase/server";
 import { archiveScope, isUuid, orIlike, pageOf, param, rangeOf, sortOf, type SearchParams } from "@/lib/list";
 import { customerSiteFilter } from "@/lib/customer-site-filter";
 import CustomerSiteFilter from "@/components/ui/CustomerSiteFilter";
+import { hasLocationText, withLocationText } from "@/lib/schema";
 import LocationButton from "@/components/map/LocationButton";
 
 export const metadata = { title: "المواقع والفروع | عين السلامة" };
 
 interface Row {
-  latitude: number | null; longitude: number | null;
+  latitude: number | null; longitude: number | null; location_text?: string | null; address?: string | null;
   id: string; ref_no: string; name: string; city: string | null; district: string | null; contact_name: string | null;
   archived_at: string | null; customer: { id: string; name: string } | null; devices: { count: number }[];
 }
@@ -25,8 +26,9 @@ export default async function SitesPage({ searchParams }: { searchParams: Promis
   const page = pageOf(sp);
   const sort = sortOf(sp, ["ref_no", "name", "city", "created_at"] as const, "created_at");
   const supabase = await createClient();
+  const hasText = await hasLocationText(supabase);
   let q = supabase.from("customer_sites")
-    .select("id, ref_no, name, city, district, contact_name, archived_at, latitude, longitude, customer:customers(id, name), devices(count)", { count: "exact" })
+    .select(withLocationText("id, ref_no, name, city, district, address, contact_name, archived_at, latitude, longitude, customer:customers(id, name), devices(count)", hasText), { count: "exact" })
     .eq("company_id", ctx.orgId).order(sort.column, { ascending: sort.ascending }).range(...rangeOf(page));
   const scope = archiveScope(sp);
   if (scope === "active") q = q.is("archived_at", null);
@@ -46,7 +48,7 @@ export default async function SitesPage({ searchParams }: { searchParams: Promis
     { key: "city", label: "المدينة / الحي", sortKey: "city", render: (r) => [r.city, r.district].filter(Boolean).join(" · ") || "—" },
     { key: "contact", label: "المسؤول", render: (r) => r.contact_name ?? "—" },
     { key: "devices", label: "الأجهزة", render: (r) => r.devices?.[0]?.count ?? 0 },
-    { key: "loc", label: "الموقع", render: (r) => <LocationButton sites={[{ id: r.id, name: r.name, latitude: r.latitude, longitude: r.longitude }]} /> },
+    { key: "loc", label: "الموقع", render: (r) => <LocationButton sites={[r]} /> },
   ];
 
   return (

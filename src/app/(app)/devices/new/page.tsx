@@ -8,6 +8,7 @@ import { hasPhase5 } from "@/lib/schema";
 import { deviceStatus } from "@/lib/labels";
 import { isUuid, orIlike, param, type SearchParams } from "@/lib/list";
 import DeviceForm, { type CatalogItemOption } from "../DeviceForm";
+import { brandNames } from "@/lib/brands";
 import { createDevice } from "../actions";
 
 export const metadata = { title: "تسجيل جهاز | عين السلامة" };
@@ -21,7 +22,7 @@ export default async function NewDevicePage({ searchParams }: { searchParams: Pr
   const crumbs = [{ label: "الأجهزة", href: "/devices" }, { label: "تسجيل جهاز" }];
   // العميل والمواقع والكتالوج تُطلب معًا في جولة واحدة (المواقع مقيدة بالعميل المطلوب نفسه)
   const picked = isUuid(customerId);
-  const [phase5Ready, { data: customer }, sites, systems, items] = await Promise.all([
+  const [phase5Ready, { data: customer }, sites, systems, items, brands] = await Promise.all([
     hasPhase5(supabase),
     picked
       ? supabase.from("customers").select("id, name").eq("id", customerId).eq("company_id", ctx.orgId).is("archived_at", null).maybeSingle()
@@ -30,6 +31,7 @@ export default async function NewDevicePage({ searchParams }: { searchParams: Pr
     picked ? supabase.from("safety_systems").select("id, name, default_interval_days").eq("company_id", ctx.orgId).is("archived_at", null).eq("is_active", true).order("sort_order").order("name") : null,
     picked ? supabase.from("catalog_items").select("id, system_id, name, manufacturer, model, device_type, default_interval_days")
       .eq("company_id", ctx.orgId).is("archived_at", null).eq("is_active", true).order("name") : null,
+    picked ? brandNames(supabase, ctx.orgId) : [],
   ]);
   const statusKeys = Object.keys(deviceStatus).filter((k) => !["faulty", "replaced"].includes(k) || phase5Ready);
 
@@ -72,7 +74,7 @@ export default async function NewDevicePage({ searchParams }: { searchParams: Pr
         <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">لا توجد أنظمة سلامة مفعّلة في الكتالوج. <Link href="/catalog" className="underline">أضف نظامًا في كتالوج أجهزة السلامة</Link> أولًا.</p>
       )}
       <section className={`${card} p-6`}>
-        <DeviceForm action={createDevice} mode="create" clientId={crypto.randomUUID()} statusKeys={statusKeys} customer={customer} sites={sites.data ?? []} systems={systems.data ?? []}
+        <DeviceForm brands={brands} action={createDevice} mode="create" clientId={crypto.randomUUID()} statusKeys={statusKeys} customer={customer} sites={sites.data ?? []} systems={systems.data ?? []}
           items={(items.data ?? []) as CatalogItemOption[]} initial={{ site_id: isUuid(siteParam) ? siteParam : "" }} cancelHref={`/customers/${customer.id}`} />
       </section>
     </div>

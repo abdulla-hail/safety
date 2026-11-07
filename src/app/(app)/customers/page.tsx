@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import FilterBar from "@/components/ui/FilterBar";
@@ -10,6 +11,8 @@ import { btnPrimary, btnSecondary, card, link } from "@/components/ui/styles";
 import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { customerType, toOptions } from "@/lib/labels";
+import { hasLocationText, withLocationText } from "@/lib/schema";
+import CustomerExplorer from "./CustomerExplorer";
 import { archiveScope, orIlike, pageOf, param, rangeOf, sortOf, withParams, type SearchParams } from "@/lib/list";
 
 export const metadata: Metadata = { title: "العملاء | عين السلامة" };
@@ -25,9 +28,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const page = pageOf(sp);
   const sort = sortOf(sp, ["ref_no", "name", "city", "created_at"] as const, "created_at");
   const supabase = await createClient();
+  const hasText = await hasLocationText(supabase);
 
   let q = supabase.from("customers")
-    .select("id, ref_no, name, customer_type, city, phone, is_active, archived_at, contact_name, sites:customer_sites(id, name, latitude, longitude, archived_at)", { count: "exact" })
+    .select(`id, ref_no, name, customer_type, city, phone, is_active, archived_at, contact_name, sites:customer_sites(${withLocationText("id, name, latitude, longitude, archived_at, address, district, city", hasText)})`, { count: "exact" })
     .eq("company_id", ctx.orgId)
     .order(sort.column, { ascending: sort.ascending })
     .range(...rangeOf(page));
@@ -60,13 +64,16 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
-        title="العملاء"
-        description="إدارة العملاء ومواقعهم وأجهزتهم والفنيين المسندين إليهم."
+        title="العملاء والفروع"
+        description="إدارة العملاء وفروعهم ومواقعهم وأجهزتهم والفنيين المسندين إليهم. اختر عميلًا لاستعراض فروعه وطباعتها."
         actions={<>
           {ctx.can("reports.view") && <Link href={withParams("/reports/customers", sp, { page: null })} className={btnSecondary}>تقرير العملاء</Link>}
           {ctx.can("customers.create") && <Link href="/customers/new" className={btnPrimary}>+ إضافة عميل</Link>}
         </>}
       />
+      <Suspense fallback={<p className={`${card} mb-6 p-5 text-sm text-slate-500`} role="status">جارٍ تحميل استعراض العميل وفروعه...</p>}>
+        <CustomerExplorer supabase={supabase} orgId={ctx.orgId} selected={param(sp, "c")} hasText={hasText} canPrint={ctx.can("reports.print")} />
+      </Suspense>
       <section className={card}>
         <FilterBar action="/customers" searchParams={sp} fields={[
           { name: "type", label: "النوع", type: "select", options: toOptions(customerType) },

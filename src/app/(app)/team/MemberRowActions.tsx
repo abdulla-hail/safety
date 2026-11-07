@@ -6,17 +6,15 @@ import { btnDangerOutline, btnPrimary, btnSecondary, btnSm, input } from "@/comp
 import InviteLinkCard from "@/components/InviteLinkCard";
 import { changeMemberEmail, setMemberRole, setMemberStatus, updateMember } from "./actions";
 
-const ROLES = [
-  { value: "supervisor", label: "مشرف" },
-  { value: "technician", label: "فني" },
-  { value: "accountant", label: "محاسب" },
-  { value: "storekeeper", label: "أمين مستودع" },
-];
-
-/** إجراءات عضو (لا تظهر للمدير الأساسي ولا لحساب المستخدم نفسه؛ وقاعدة البيانات تفرض ذلك أيضًا). */
-export default function MemberRowActions({ id, role, status, fullName, jobTitle, specialty }: {
-  id: string; role: string; status: string; fullName: string; jobTitle: string; specialty: string;
+/**
+ * إجراءات عضو (لا تظهر للمدير الأساسي ولا لحساب المستخدم نفسه، ولا لمدير إلا للمدير الأساسي؛ وقاعدة البيانات تفرض ذلك أيضًا).
+ * الدوران: فني، ومدير (يعيّنه المدير الأساسي فقط).
+ */
+export default function MemberRowActions({ id, role, status, fullName, jobTitle, specialty, canAssignManager }: {
+  id: string; role: string; status: string; fullName: string; jobTitle: string; specialty: string; canAssignManager: boolean;
 }) {
+  const roles = [{ value: "technician", label: "فني" }, ...(canAssignManager || role === "company_manager" ? [{ value: "company_manager", label: "مدير" }] : [])];
+  const known = roles.some((r) => r.value === role);
   const [open, setOpen] = useState<"" | "edit" | "email">("");
   const [roleState, roleAction, rolePending] = useActionState(setMemberRole, initialActionState);
   const [stState, stAction, stPending] = useActionState(setMemberStatus, initialActionState);
@@ -28,11 +26,12 @@ export default function MemberRowActions({ id, role, status, fullName, jobTitle,
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         {status !== "removed" && (
-          <form action={roleAction} className="flex items-center gap-1" onSubmit={confirmThen("تغيير دور العضو؟")}>
+          <form action={roleAction} className="flex items-center gap-1" onSubmit={confirmThen("تغيير دور العضو؟ تعود صلاحياته إلى افتراضيات الدور الجديد (المدير: كل الصلاحيات).")}>
             <input type="hidden" name="membership_id" value={id} />
             <label htmlFor={`role-${id}`} className="sr-only">الدور</label>
-            <select id={`role-${id}`} name="role" defaultValue={role} className={`${input} !w-auto !py-1 text-xs`}>
-              {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            <select id={`role-${id}`} name="role" defaultValue={known ? role : ""} required className={`${input} !w-auto !py-1 text-xs`}>
+              {!known && <option value="" disabled>اختر الدور</option>}
+              {roles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
             <button aria-busy={rolePending} type="submit" disabled={rolePending} className={`${btnSecondary} ${btnSm}`}>حفظ الدور</button>
           </form>

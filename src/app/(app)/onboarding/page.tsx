@@ -6,7 +6,7 @@ import { btnSecondary, card, cardHeader, cardTitle } from "@/components/ui/style
 import { cookies } from "next/headers";
 import { platformHome, requireUser } from "@/lib/auth/context";
 import { INVITE_NEXT_COOKIE, readCookiePath, safeInvitePath } from "@/lib/invite-next";
-import { companyMemberStatus, companyRole } from "@/lib/labels";
+import { companyMemberStatus, roleLabel } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "العضوية | عين السلامة" };
 
@@ -44,7 +44,7 @@ export default async function OnboardingPage() {
               return (
                 <li key={m.member_id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
-                    <p className="font-semibold">{m.organization_name} <span className="text-xs font-normal text-slate-500">· {companyRole[m.job_roles[0] === "manager" ? "company_manager" : m.job_roles[0]] ?? ""}</span></p>
+                    <p className="font-semibold">{m.organization_name} <span className="text-xs font-normal text-slate-500">· {roleLabel(m.role, m.is_primary)}</span></p>
                     <p className="mt-1 text-sm text-slate-500">{memberReason || company.reason}</p>
                   </div>
                   <div className="flex gap-2">

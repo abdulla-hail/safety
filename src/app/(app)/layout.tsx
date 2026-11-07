@@ -5,7 +5,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import type { NavItem } from "@/components/layout/Sidebar";
 import Flash from "@/components/ui/Flash";
 import { requireUser, isUsable } from "@/lib/auth/context";
-import { JOB_ROLE_LABELS } from "@/lib/permissions";
+import { roleLabel } from "@/lib/labels";
 
 export const instant = false;
 
@@ -47,12 +47,12 @@ async function AppFrame({ children }: { children: ReactNode }) {
     if (phase5 && !fieldOnly && any("faults.view", "faults.update")) items.push({ label: "البلاغات والأعطال", icon: "shieldAlert", href: "/faults", section: "العمل" });
     if (any("reports.view")) items.push({ label: "التقارير", icon: "chart", href: "/reports", section: "العمل" });
     // إدارة أعضاء الشركة ودعواتهم والفنيين لمدير الشركة؛ الإسناد التشغيلي لمن يملكه
-    if (m.is_owner) items.push({ label: "الفريق والدعوات", icon: "userCog", href: "/team", section: "الإدارة" });
+    if (m.can_manage_team) items.push({ label: "الفريق والدعوات", icon: "userCog", href: "/team", section: "الإدارة" });
     if (any("assignments.manage")) items.push({ label: "إسناد الفنيين", icon: "link", href: "/assignments", section: "الإدارة" });
-    if (any("catalog.manage")) items.push({ label: "كتالوج الأجهزة", icon: "book", href: "/catalog", section: "الإدارة" });
-    if (any("catalog.manage")) items.push({ label: "الماركات", icon: "book", href: "/brands", section: "الإدارة" });
+    // الماركات قسم فرعي داخل كتالوج الأجهزة (/catalog/brands)
+    if (any("catalog.view", "catalog.manage")) items.push({ label: "كتالوج الأجهزة", icon: "book", href: "/catalog", section: "الإدارة" });
     if (any("settings.branding")) items.push({ label: "هوية الشركة", icon: "settings", href: "/settings/company", section: "الإدارة" });
-    if (m.is_owner) items.push({ label: "سجل التدقيق", icon: "history", href: "/settings/audit", section: "الإدارة" });
+    if (m.is_primary || can("audit.view")) items.push({ label: "سجل التدقيق", icon: "history", href: "/settings/audit", section: "الإدارة" });
   }
   if (!m) items.push({ label: "الإشعارات", icon: "bell", href: "/notifications" });
   if (ctx.platformPermissions.has("platform.companies.view")) items.push({ label: "إدارة الشركات (المنصة)", icon: "building", href: "/platform-admin", section: "المنصة" });
@@ -64,7 +64,7 @@ async function AppFrame({ children }: { children: ReactNode }) {
   const logoUrl = m ? (m.logo_path ? `/company-logo?v=${encodeURIComponent(m.logo_path)}` : null) : ctx.platformLogoUrl;
 
   const roleName = m
-    ? m.is_owner ? "مدير الشركة" : m.job_roles.map((r) => JOB_ROLE_LABELS[r] ?? r).join("، ") || "عضو"
+    ? roleLabel(m.role, m.is_primary)
     : ctx.platformRole === "owner" ? "مالك المنصة" : ctx.platformRole === "assistant" ? "مساعد المالك" : "بانتظار العضوية";
 
   return (

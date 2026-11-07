@@ -21,3 +21,7 @@ export const itemFields: FieldDef[] = [
   { name: "description", label: "الوصف", type: "textarea" },
   { name: "specs", label: "الخصائص الفنية", type: "textarea", help: "سطر لكل خاصية بصيغة «الخاصية: القيمة»، مثل: السعة: 6 كجم" },
 ];
+
+/** حقل «الشركة المصنعة» يقترح ماركات الكتالوج (ويقبل أي قيمة أخرى) */
+export const withBrandSuggestions = (fields: FieldDef[], brands: string[]): FieldDef[] =>
+  fields.map((x) => (x.name === "manufacturer" ? { ...x, suggestions: brands, help: brands.length ? "اختر من ماركات الكتالوج أو اكتب اسمًا آخر." : x.help } : x));

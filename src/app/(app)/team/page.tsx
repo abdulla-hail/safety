@@ -11,7 +11,8 @@ import { type SearchParams } from "@/lib/list";
 import { loadTeam, memberSpecialties, teamFilterQuery, type TeamMember } from "@/lib/team";
 import { requireUser } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { companyInvitationKind, companyMemberStatus, companyRole, invitationStatus, TECHNICIAN_SPECIALTIES } from "@/lib/labels";
+import { companyInvitationKind, companyMemberStatus, companyRole, invitationStatus, roleLabel, TECHNICIAN_SPECIALTIES } from "@/lib/labels";
+import { ALL_PERMISSIONS, MANAGEMENT_PERMISSIONS } from "@/lib/permissions";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { effectiveInvitationStatus, INVITE_ROLES, isMissingSchema, SCHEMA_PENDING_MESSAGE } from "@/lib/invitations";
 import { resendInvitation, revokeInvitation, transferManagement } from "./actions";
@@ -28,9 +29,9 @@ const s = (r: Row, k: string) => (r[k] as string | null | undefined) ?? "";
 export default async function TeamPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireUser();
   const m = ctx.active;
-  // إدارة الأعضاء لمدير الشركة فقط؛ وقاعدة البيانات تتحقق من ذلك مجددًا في كل عملية
+  // إدارة الفريق لمن يملك team.manage من المديرين؛ إدارة المديرين للمدير الأساسي فقط. قاعدة البيانات تتحقق مجددًا في كل عملية
   if (!m) redirect(ctx.platformRole ? "/platform-admin" : "/onboarding");
-  if (!m.is_owner) redirect("/forbidden");
+  if (!m.can_manage_team) redirect("/forbidden");
   const company = m.organization_id;
   const sp = await searchParams;
   const supabase = await createClient();
@@ -51,12 +52,23 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const schemaReady = !isMissingSchema(invites.error);
   const list = members.rows as unknown as Row[];
   const iAmPrimary = m.is_primary;
+  // المدير يملك كل الصلاحيات ما لم يخصصها المدير الأساسي؛ غير المدير الأساسي لا يمنح ما لا يملكه
+  const managerAll = ALL_PERMISSIONS.filter((p) => p !== "field.assigned") as string[];
+  const effectiveOf = (x: Row) => Array.isArray(x.permissions) ? (x.permissions as string[])
+    : x.role === "company_manager" ? managerAll : defaultsFor(String(x.role)).filter((p) => !MANAGEMENT_PERMISSIONS.includes(p));
+  const grantable = iAmPrimary ? undefined : [...m.permissions];
+  const canManage = (x: Row) => x.is_primary !== true && x.user_id !== ctx.user.id && (x.role !== "company_manager" || iAmPrimary);
   const filterQs = teamFilterQuery(sp);
   const filtered = filterQs.length > 0;
 
   return (
     <div className="space-y-6">
       <PageHeader title="فريق الشركة" description={`أعضاء ${m.organization_name} وأدوارهم ودعواتهم. تُمنح الصلاحيات بعد قبول الدعوة فقط، وبالبريد المدعو نفسه.`} />
+      <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        في الشركة دوران: <b>مدير</b> و<b>فني</b>. <b>المدير الأساسي</b> (من أنشأ الشركة) يملك كل الصلاحيات دائمًا ولا يُعدَّل أو يُزال من هنا،
+        وهو وحده من يعيّن المديرين ويحدد صلاحياتهم (كل الصلاحيات افتراضيًا). المدير الذي يملك «إدارة الفريق» يدير الفنيين ودعواتهم.
+        الفني يحتفظ بصلاحياته التشغيلية فقط دون إدارة الشركة أو الفريق.
+      </p>
       {!schemaReady && <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{SCHEMA_PENDING_MESSAGE}</p>}
 
       <section className={card}>
@@ -87,7 +99,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                   <div className="flex items-start gap-3">
                   <input type="checkbox" name="ids" value={String(x.id)} form="team-form" aria-label={`تحديد ${s(x, "full_name") || "العضو"}`} className="mt-1 size-4 accent-[var(--brand)]" />
                   <div>
-                    <p className="font-semibold">{s(x, "full_name") || "—"} · {companyRole[String(x.role)] ?? String(x.role)}
+                    <p className="font-semibold">{s(x, "full_name") || "—"} · {isPrimary ? "مدير" : roleLabel(String(x.role))}
                       {isPrimary && <span className="ms-2 rounded bg-brand-soft px-1.5 text-[11px] text-brand-strong">المدير الأساسي</span>}
                       {isMe && <span className="ms-2 rounded bg-slate-100 px-1.5 text-[11px]">أنت</span>}</p>
                     <p className="text-xs text-slate-500"><span dir="ltr">{s(x, "email") || String(x.user_id).slice(0, 8) + "…"}</span>
@@ -101,16 +113,19 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                   if (t) return <p className="text-xs text-slate-600">سجل الفني التشغيلي: <Link href={`/technicians/${t.id}`} className={link} dir="ltr">{t.ref_no}</Link>{!t.is_active && " (موقوف)"} — الإسنادات والتخصصات من صفحته.</p>;
                   return schemaReady && x.status === "active" ? <LinkTechnicianButton membershipId={String(x.id)} /> : null;
                 })()}
-                {schemaReady && !isPrimary && !isMe && (
-                  <MemberRowActions id={String(x.id)} role={String(x.role)} status={String(x.status)}
+                {isPrimary && <p className="text-xs text-slate-500">يملك كل الصلاحيات دائمًا؛ محمي من التعديل والتعطيل والإزالة (يتغير بإجراء «نقل الإدارة» فقط).</p>}
+                {schemaReady && canManage(x) && (
+                  <MemberRowActions id={String(x.id)} role={String(x.role)} status={String(x.status)} canAssignManager={iAmPrimary}
                     fullName={s(x, "full_name")} jobTitle={s(x, "job_title")} specialty={s(x, "specialty")} />
                 )}
-                {schemaReady && !isPrimary && !isMe && x.role !== "company_manager" && x.status !== "removed" && (
+                {schemaReady && canManage(x) && x.status !== "removed" && (
                   <details>
-                    <summary className="cursor-pointer text-xs font-semibold text-primary">الصلاحيات التفصيلية{Array.isArray(x.permissions) ? " (مخصصة)" : ""}</summary>
+                    <summary className="cursor-pointer text-xs font-semibold text-primary">
+                      {x.role === "company_manager" ? (Array.isArray(x.permissions) ? "صلاحيات المدير (محددة)" : "صلاحيات المدير (كل الصلاحيات)") : `الصلاحيات التفصيلية${Array.isArray(x.permissions) ? " (مخصصة)" : ""}`}
+                    </summary>
                     <div className="mt-2">
-                      <PermissionsEditor membershipId={String(x.id)} customized={Array.isArray(x.permissions)}
-                        effective={Array.isArray(x.permissions) ? (x.permissions as string[]) : defaultsFor(String(x.role))} available={available} />
+                      <PermissionsEditor membershipId={String(x.id)} customized={Array.isArray(x.permissions)} manager={x.role === "company_manager"}
+                        effective={effectiveOf(x)} available={available} grantable={grantable} />
                     </div>
                   </details>
                 )}
@@ -141,13 +156,14 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
       {schemaReady && (
         <section id="invite" className={`${card} scroll-mt-20`}>
-          <div className={cardHeader}><h2 className={cardTitle}>دعوة عضو جديد (ومنهم الفنيون)</h2></div>
+          <div className={cardHeader}><h2 className={cardTitle}>دعوة عضو جديد (مدير أو فني)</h2></div>
           <div className="p-5">
             <p className="mb-4 text-sm text-slate-600">
               ينشئ رابطًا خاصًا يُنسخ أو يُشارك يدويًا (لا يُرسل بريد آليًا). يفتحه المدعو ويسجل الدخول بحساب Google بالبريد نفسه ثم يقبل؛
               الرابط يُستخدم مرة واحدة ويُرفض بعد انتهائه أو إلغائه أو بغير البريد المدعو.
             </p>
-            <MemberInviteForm roleDefaults={Object.fromEntries(INVITE_ROLES.map((r) => [r, defaultsFor(r)]))} available={available} />
+            <MemberInviteForm canInviteManager={iAmPrimary} grantable={grantable} available={available}
+              roleDefaults={Object.fromEntries(INVITE_ROLES.map((r) => [r, r === "company_manager" ? managerAll : defaultsFor(r).filter((p) => !MANAGEMENT_PERMISSIONS.includes(p))]))} />
           </div>
         </section>
       )}
@@ -161,7 +177,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
               return (
                 <li key={String(i.id)} className="flex flex-wrap items-start justify-between gap-3 px-5 py-3 text-sm">
                   <div>
-                    <p><span dir="ltr" className="font-semibold">{String(i.email)}</span> · {companyInvitationKind[String(i.kind)]} · {companyRole[String(i.role)]}</p>
+                    <p><span dir="ltr" className="font-semibold">{String(i.email)}</span> · {companyInvitationKind[String(i.kind)]} · {companyRole[String(i.role)] ?? "عضو"}</p>
                     <p className="text-xs text-slate-500">{[s(i, "full_name"), s(i, "specialty") && specialtyText(s(i, "specialty")),
                       Array.isArray(i.permissions) && `صلاحيات مخصصة (${(i.permissions as string[]).length})`].filter(Boolean).join(" · ")}
                       {" "}· أُنشئت {formatDateTime(s(i, "created_at"))} · تنتهي {formatDateTime(s(i, "expires_at"))}</p>
@@ -184,7 +200,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <section className={card}>
           <div className={cardHeader}><h2 className={cardTitle}>نقل إدارة الشركة</h2></div>
           <div className="space-y-3 p-5">
-            <p className="text-sm text-slate-600">إجراء منفصل ومحمي: يُنشأ رابط للمدير الجديد، ولا تنتقل الإدارة إلا بعد قبوله بالبريد نفسه. بعدها تصبح عضوًا بدور مشرف دون حذف سجلاتك.</p>
+            <p className="text-sm text-slate-600">إجراء منفصل ومحمي: يُنشأ رابط للمدير الجديد، ولا تنتقل الإدارة إلا بعد قبوله بالبريد نفسه. بعدها تبقى «مديرًا» في الشركة بكل الصلاحيات دون حذف سجلاتك، ويصبح هو المدير الأساسي.</p>
             <InviteForm action={transferManagement} submitLabel="إنشاء دعوة نقل الإدارة" fields={[
               { name: "email", label: "بريد المدير الجديد", type: "email", required: true, dir: "ltr" },
               { name: "expires_hours", label: "صلاحية الدعوة (ساعة)", type: "number", defaultValue: "48" },

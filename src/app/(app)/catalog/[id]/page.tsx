@@ -9,7 +9,8 @@ import { requireOrg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { archiveScope, isUuid, type SearchParams } from "@/lib/list";
 import { createItem, updateSystem } from "../actions";
-import { itemFields, systemFields } from "../fields";
+import { itemFields, systemFields, withBrandSuggestions } from "../fields";
+import { brandNames } from "@/lib/brands";
 
 export const metadata = { title: "نظام سلامة | عين السلامة" };
 
@@ -26,9 +27,10 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
   if (scope === "active") q = q.is("archived_at", null);
   if (scope === "archived") q = q.not("archived_at", "is", null);
   // جولة متوازية واحدة بدل طلبين متتابعين
-  const [{ data: s }, { data: items }] = await Promise.all([
+  const [{ data: s }, { data: items }, brands] = await Promise.all([
     supabase.from("safety_systems").select("*").eq("id", id).eq("company_id", ctx.orgId).maybeSingle(),
     q,
+    brandNames(supabase, ctx.orgId),
   ]);
   if (!s) notFound();
   type Item = { id: string; ref_no: string; name: string; manufacturer: string | null; model: string | null; device_type: string | null;
@@ -95,7 +97,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
           <section className={card}>
             <div className={cardHeader}><h2 className={cardTitle}>إضافة جهاز / موديل لهذا النظام</h2></div>
             <div className="p-5">
-              <EntityForm action={createItem} fields={[{ name: "system_id", label: "", type: "hidden" }, ...itemFields]}
+              <EntityForm action={createItem} fields={[{ name: "system_id", label: "", type: "hidden" }, ...withBrandSuggestions(itemFields, brands)]}
                 initial={{ system_id: id, is_active: "true", default_interval_days: s.default_interval_days }} submitLabel="إضافة التعريف" />
             </div>
           </section>

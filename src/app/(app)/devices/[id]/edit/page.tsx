@@ -7,6 +7,7 @@ import { hasInspections, hasPhase5 } from "@/lib/schema";
 import { deviceStatus } from "@/lib/labels";
 import { isUuid } from "@/lib/list";
 import DeviceForm, { type CatalogItemOption } from "../../DeviceForm";
+import { brandNames } from "@/lib/brands";
 import { updateDevice } from "../../actions";
 
 export const metadata = { title: "تعديل جهاز | عين السلامة" };
@@ -17,7 +18,7 @@ export default async function EditDevicePage({ params }: { params: Promise<{ id:
   if (!isUuid(id)) notFound();
   const supabase = await createClient();
   // «معطل» و«مستبدل» تتطلبان المرحلة الخامسة في القاعدة
-  const [phase5Ready, dueLocked] = await Promise.all([hasPhase5(supabase), hasInspections(supabase)]);
+  const [phase5Ready, dueLocked, brands] = await Promise.all([hasPhase5(supabase), hasInspections(supabase), brandNames(supabase, ctx.orgId)]);
   const statusKeys = Object.keys(deviceStatus).filter((k) => !["faulty", "replaced"].includes(k) || phase5Ready);
   // جولة واحدة: الجهاز مع مواقع عميله وتعريف كتالوجه مضمّنين، والأنظمة بالتوازي (كانت جولتين متتابعتين)
   const [{ data: d }, systems] = await Promise.all([
@@ -35,7 +36,7 @@ export default async function EditDevicePage({ params }: { params: Promise<{ id:
         crumbs={[{ label: "الأجهزة", href: "/devices" }, { label: d.name, href: `/devices/${id}` }, { label: "تعديل" }]}
         description="تعديل البيانات لا يغيّر الرقم المرجعي ولا رمز QR، ولا يعدّل سجلات الصيانة السابقة." />
       <section className={`${card} p-6`}>
-        <DeviceForm action={updateDevice} mode="edit" statusKeys={statusKeys} customer={d.customer} sites={sites.data ?? []} systems={systems.data ?? []}
+        <DeviceForm brands={brands} action={updateDevice} mode="edit" statusKeys={statusKeys} customer={d.customer} sites={sites.data ?? []} systems={systems.data ?? []}
           items={(items.data ?? []) as CatalogItemOption[]} initial={d} cancelHref={`/devices/${id}`} currentImageUrl={imageUrl} dueLocked={dueLocked} />
       </section>
     </div>

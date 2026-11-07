@@ -19,7 +19,7 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 async function managedCompany() {
   const ctx = await getContext();
   const m = ctx?.active;
-  return m && m.is_owner ? m.organization_id : null;
+  return m && m.can_manage_team ? m.organization_id : null;
 }
 
 function hours(fd: FormData) {
@@ -28,7 +28,7 @@ function hours(fd: FormData) {
 
 export async function inviteMember(prev: ActionState, fd: FormData): Promise<ActionState> {
   const company = await managedCompany();
-  if (!company) return fail(prev, fd, "هذه العملية لمدير الشركة فقط.");
+  if (!company) return fail(prev, fd, "دعوة الأعضاء لمن يملك صلاحية إدارة الفريق.");
   const email = str(fd, "email").toLowerCase();
   const role = str(fd, "role");
   const errors: Record<string, string> = {};
@@ -54,7 +54,7 @@ export async function inviteMember(prev: ActionState, fd: FormData): Promise<Act
     note = pe ? `تم إنشاء الدعوة بصلاحيات الدور الافتراضية؛ تعذر حفظ التخصيص: ${rpcErrorMessage(pe)}` : `تم إنشاء الدعوة بصلاحيات مخصصة (${perms.length}).`;
   }
   revalidatePath("/team");
-  return inviteResult(prev, data as { token?: string }, companyRole[role] ?? role, note);
+  return inviteResult(prev, data as { token?: string }, companyRole[role] ?? "عضو", note);
 }
 
 /** ربط عضو فني نشط (انضم قبل الربط التلقائي) بسجل فني تشغيلي واحد */
@@ -104,7 +104,7 @@ export async function updateMember(prev: ActionState, fd: FormData): Promise<Act
 export async function setMemberRole(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const id = str(fd, "membership_id");
   const role = str(fd, "role");
-  if (!(await managedCompany()) || !isUuid(id) || !(INVITE_ROLES as readonly string[]).includes(role)) return { ok: false, message: "طلب غير صالح." };
+  if (!(await managedCompany()) || !isUuid(id) || !(INVITE_ROLES as readonly string[]).includes(role)) return { ok: false, message: "الأدوار المتاحة: مدير أو فني." };
   const supabase = await createClient();
   const { error } = await supabase.rpc("company_set_member_role", { p_membership: id, p_role: role });
   if (error) return { ok: false, message: rpcErrorMessage(error) };
@@ -146,7 +146,7 @@ export async function transferManagement(prev: ActionState, fd: FormData): Promi
   if (error) return fail(prev, fd, rpcErrorMessage(error));
   revalidatePath("/team");
   return inviteResult(prev, data as { token?: string }, "نقل إدارة الشركة",
-    "أُنشئت دعوة نقل الإدارة. عند قبولها يصبح صاحب البريد الجديد المدير الأساسي وتصبح أنت مشرفًا.");
+    "أُنشئت دعوة نقل الإدارة. عند قبولها يصبح صاحب البريد الجديد المدير الأساسي وتبقى أنت مديرًا.");
 }
 
 export async function setMemberPermissions(_prev: ActionState, fd: FormData): Promise<ActionState> {
@@ -158,5 +158,5 @@ export async function setMemberPermissions(_prev: ActionState, fd: FormData): Pr
   const { error } = await supabase.rpc("company_set_member_permissions", { p_membership: id, p_permissions: perms });
   if (error) return { ok: false, message: rpcErrorMessage(error) };
   revalidatePath("/team");
-  return { ok: true, message: reset ? "عادت صلاحيات العضو إلى الافتراضية لدوره." : "تم حفظ صلاحيات العضو وإشعاره." };
+  return { ok: true, message: reset ? "عادت صلاحيات العضو إلى الافتراضية لدوره (المدير: كل الصلاحيات)." : "تم حفظ صلاحيات العضو وإشعاره." };
 }

@@ -23,6 +23,8 @@ export interface FieldDef {
   max?: number;
   dir?: "ltr" | "rtl";
   maxLength?: number;
+  /** اقتراحات للحقل النصي (datalist): يختار منها المستخدم أو يكتب قيمة جديدة */
+  suggestions?: string[];
 }
 
 type Values = Record<string, string | string[] | boolean | number | null | undefined>;
@@ -118,9 +120,12 @@ export default function EntityForm({
             }
             default:
               control = (
-                <input {...common} type={f.type ?? "text"} defaultValue={asString(values[f.name])} placeholder={f.placeholder}
-                       min={f.min} max={f.max} dir={f.dir} maxLength={f.maxLength ?? 300}
-                       className={f.type === "color" ? "h-10 w-24 cursor-pointer rounded-lg border border-slate-300 bg-white p-1" : input} />
+                <>
+                  <input {...common} type={f.type ?? "text"} defaultValue={asString(values[f.name])} placeholder={f.placeholder}
+                         min={f.min} max={f.max} dir={f.dir} maxLength={f.maxLength ?? 300} list={f.suggestions?.length ? `${id}-list` : undefined}
+                         className={f.type === "color" ? "h-10 w-24 cursor-pointer rounded-lg border border-slate-300 bg-white p-1" : input} />
+                  {f.suggestions?.length ? <datalist id={`${id}-list`}>{f.suggestions.map((s) => <option key={s} value={s} />)}</datalist> : null}
+                </>
               );
           }
           return (

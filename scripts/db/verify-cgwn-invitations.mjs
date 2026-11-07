@@ -56,10 +56,11 @@ try {
 
   const inv = await rpc(manager, "company_invite_member", [company, `tech.${tag}@ays-test.invalid`, "technician", "فني اختبار", "فني", "إنذار", 24]);
   ok("المدير يدعو فنيًا", !!inv.data?.token);
-  ok("المدير لا يمنح دور مدير بالدعوة", (await rpc(manager, "company_invite_member", [company, "z@y.zz", "company_manager", null, null, null, 24])).error?.includes("دور غير مسموح"));
+  ok("الأدوار القديمة مرفوضة في الدعوة (مدير أو فني فقط)", (await rpc(manager, "company_invite_member", [company, "z@y.zz", "supervisor", null, null, null, 24])).error?.includes("مدير أو فني"));
+  ok("المدير الأساسي يدعو مديرًا إضافيًا", !!(await rpc(manager, "company_invite_member", [company, `m2.${tag}@ays-test.invalid`, "company_manager", null, null, null, 24])).data?.token);
   ok("الفني يقبل دعوته", !(await rpc(tech, "accept_company_invitation", [inv.data?.token])).error);
   ok("الفني لا يرى دعوات الشركة", ((await as(tech, "select id from public.company_invitations")).rows ?? [1]).length === 0);
-  ok("الفني لا يدعو أعضاء", (await rpc(tech, "company_invite_member", [company, "q@y.zz", "technician", null, null, null, 24])).error?.includes("لمدير الشركة"));
+  ok("الفني لا يدعو أعضاء", (await rpc(tech, "company_invite_member", [company, "q@y.zz", "technician", null, null, null, 24])).error?.includes("إدارة الفريق"));
   ok("غير العضو لا يرى الشركة", ((await as(stranger, "select id from public.companies where id=$1", [company])).rows ?? [1]).length === 0);
   ok("لا قراءة لبصمة الرمز", (await as(manager, "select token_hash from public.company_invitations")).error?.includes("permission denied"));
   ok("لا كتابة مباشرة على العضويات", (await as(manager, "update public.company_memberships set role='company_manager'")).error?.includes("permission denied"));

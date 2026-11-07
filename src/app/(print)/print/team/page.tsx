@@ -4,7 +4,7 @@ import { PrintDocument } from "@/components/print/PrintDocument";
 import { requireUser } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { loadBranding } from "@/lib/branding";
-import { companyMemberStatus, companyRole, TECHNICIAN_SPECIALTIES } from "@/lib/labels";
+import { companyMemberStatus, companyRole, roleLabel, TECHNICIAN_SPECIALTIES } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import { param, params, type SearchParams } from "@/lib/list";
 import { loadTeam, memberSpecialties } from "@/lib/team";
@@ -14,7 +14,7 @@ export const metadata = { title: "بيانات فريق الشركة | طباع�
 /** طباعة عضو أو مجموعة أو كل الأعضاء المطابقين؛ لمدير الشركة فقط وبيانات شركته فقط (RLS). */
 export default async function PrintTeam({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const ctx = await requireUser();
-  if (!ctx.active?.is_owner) redirect("/forbidden");
+  if (!ctx.active?.can_manage_team) redirect("/forbidden");
   const sp = await searchParams;
   const supabase = await createClient();
   const [{ rows }, b] = await Promise.all([loadTeam(supabase, ctx.active.organization_id, sp), loadBranding(supabase, ctx.active.organization_id)]);
@@ -37,7 +37,7 @@ export default async function PrintTeam({ searchParams }: { searchParams: Promis
                   <td>{i + 1}</td>
                   <td>{m.full_name ?? ""}{m.is_primary ? " (المدير الأساسي)" : ""}</td>
                   <td dir="ltr">{m.email ?? ""}</td>
-                  <td>{companyRole[m.role] ?? m.role}</td>
+                  <td>{roleLabel(m.role, m.is_primary)}</td>
                   <td>{m.job_title ?? ""}</td>
                   <td>{memberSpecialties(m).join("، ")}</td>
                   <td dir="ltr">{m.technician?.phone ?? ""}</td>

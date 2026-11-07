@@ -11,7 +11,7 @@ import { isUuid } from "@/lib/list";
 import { formatDate } from "@/lib/format";
 import { deviceStatus } from "@/lib/labels";
 import MapView from "@/components/map/MapView";
-import { directionsUrl, mapUrl, validLatLng } from "@/lib/geo";
+import { classifyLocation, directionsHref, directionsUrl, LOCATION_KIND_LABEL, locationHref, validLatLng } from "@/lib/geo";
 
 export const metadata = { title: "بيانات الموقع | عين السلامة" };
 
@@ -27,6 +27,9 @@ export default async function SitePage({ params }: { params: Promise<{ id: strin
   ]);
   if (!s) notFound();
   const pos = validLatLng(s.latitude, s.longitude);
+  const locText: string | null = (s as { location_text?: string | null }).location_text ?? null;
+  const openHref = locationHref({ ...s, location_text: locText });
+  const dirHref = directionsHref({ ...s, location_text: locText });
 
   return (
     <div className="space-y-6">
@@ -43,18 +46,20 @@ export default async function SitePage({ params }: { params: Promise<{ id: strin
         </>} />
       <section className={card}>
         <div className={cardHeader}><h2 className={cardTitle}>بيانات الفرع</h2>
-          {pos && <div className="flex flex-wrap gap-2">
-            <a href={directionsUrl(pos)} target="_blank" rel="noopener noreferrer" className={`${btnPrimary} ${btnSm}`}>الاتجاهات إلى الفرع</a>
-            <a href={mapUrl(pos)} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>فتح في خرائط Google</a>
+          {openHref && <div className="flex flex-wrap gap-2">
+            {dirHref && <a href={dirHref} target="_blank" rel="noopener noreferrer" className={`${btnPrimary} ${btnSm}`}>الاتجاهات إلى الفرع</a>}
+            <a href={openHref} target="_blank" rel="noopener noreferrer" className={`${btnSecondary} ${btnSm}`}>📍 فتح في خرائط Google</a>
           </div>}</div>
         <InfoGrid items={[
           ["العميل", s.customer && <Link href={`/customers/${s.customer.id}`} className={link}>{s.customer.name}</Link>],
           ["المدينة", s.city], ["الحي", s.district], ["العنوان", s.address],
+          ["الموقع", locText && <span className="break-all" dir="auto">{locText} <span className="ms-1 rounded bg-slate-100 px-1.5 text-[10px] text-slate-600">{LOCATION_KIND_LABEL[classifyLocation(locText)]}</span></span>],
+          ["الإحداثيات", pos && <span dir="ltr">{pos.lat}, {pos.lng}</span>],
           ["المسؤول", s.contact_name], ["الهاتف", s.contact_phone && <a href={`tel:${s.contact_phone}`} dir="ltr" className={link}>{s.contact_phone}</a>], ["ملاحظات", s.notes],
         ]} />
         <div className="border-t border-slate-100 p-5">
           {pos ? <MapView markers={[{ ...pos, label: s.name, directions: directionsUrl(pos) }]} height={280} />
-            : <p className="text-sm text-slate-500">لم يُحدَّد موقع الفرع على الخريطة بعد.{ctx.can("sites.update") && <> <Link href={`/sites/${id}/edit`} className={link}>حدده الآن</Link></>}</p>}
+            : <p className="text-sm text-slate-500">{locText ? "لم تُحدَّد نقطة الفرع على الخريطة؛ زر «فتح في خرائط Google» يستخدم نص الموقع المحفوظ." : "لم يُحدَّد موقع الفرع على الخريطة بعد."}{ctx.can("sites.update") && <> <Link href={`/sites/${id}/edit`} className={link}>حدده الآن</Link></>}</p>}
         </div>
       </section>
       <section className={card}>

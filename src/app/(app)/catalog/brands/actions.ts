@@ -17,7 +17,7 @@ export async function addBrand(prev: ActionState, fd: FormData): Promise<ActionS
   const supabase = await createClient();
   const { error } = await supabase.from("brands").insert({ company_id: ctx.orgId, name });
   if (error) return fail(prev, fd, error.code === "23505" ? "الماركة موجودة بالفعل." : dbErrorMessage(error), error.code === "23505" ? { name: "مكررة" } : undefined);
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
   return { ok: true, message: `أُضيفت الماركة «${name}».`, attempt: (prev.attempt ?? 0) + 1 };
 }
 
@@ -31,7 +31,7 @@ export async function renameBrand(prev: ActionState, fd: FormData): Promise<Acti
   const { data, error } = await supabase.from("brands").update({ name }).eq("id", id).eq("company_id", ctx.orgId).select("id");
   if (error) return fail(prev, fd, error.code === "23505" ? "يوجد ماركة بهذا الاسم." : dbErrorMessage(error));
   if (!data?.length) return fail(prev, fd, "الماركة غير موجودة.");
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
   return { ok: true, message: "حُفظ الاسم. البنود السابقة تحتفظ بالاسم المسجل وقت إضافتها.", attempt: (prev.attempt ?? 0) + 1 };
 }
 
@@ -44,6 +44,6 @@ export async function deleteBrand(_prev: ActionState, fd: FormData): Promise<Act
   const { data, error } = await supabase.from("brands").delete().eq("id", id).eq("company_id", ctx.orgId).select("id");
   if (error) return { ok: false, message: dbErrorMessage(error) };
   if (!data?.length) return { ok: false, message: "الماركة غير موجودة." };
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
   return { ok: true, message: "حُذفت الماركة من القائمة." };
 }

@@ -4,23 +4,27 @@ import { useActionState, useState } from "react";
 import { initialActionState } from "@/lib/action-state";
 import { btnPrimary, input, label } from "@/components/ui/styles";
 import InviteLinkCard from "@/components/InviteLinkCard";
-import { permissionsByModule } from "@/lib/permissions";
+import { MANAGEMENT_PERMISSIONS, permissionsByModule } from "@/lib/permissions";
 import { TECHNICIAN_SPECIALTIES } from "@/lib/labels";
 import { inviteMember } from "./actions";
 
-const ROLES = [["technician", "فني"], ["supervisor", "مشرف"], ["accountant", "محاسب"], ["storekeeper", "أمين مستودع"]] as const;
-
 /**
- * دعوة عضو (والفني خاصةً): البيانات والتخصصات والصلاحيات تُحفظ مع الدعوة، وعند القبول بالبريد نفسه
- * يصبح عضوًا في الشركة ويُنشأ/يُربط سجله الفني التشغيلي تلقائيًا في قاعدة البيانات.
+ * دعوة عضو بدور «فني» أو «مدير» (المدير للمدير الأساسي فقط): البيانات والتخصصات والصلاحيات تُحفظ مع الدعوة، وعند القبول
+ * بالبريد نفسه يصبح عضوًا بصلاحيات دوره (المدير: كل الصلاحيات ما لم تُحدد)، ويُنشأ/يُربط سجل الفني التشغيلي تلقائيًا.
  */
-export default function MemberInviteForm({ roleDefaults, available }: { roleDefaults: Record<string, string[]>; available?: string[] }) {
+export default function MemberInviteForm({ roleDefaults, available, canInviteManager, grantable }: {
+  roleDefaults: Record<string, string[]>; available?: string[]; canInviteManager: boolean; grantable?: string[];
+}) {
+  const ROLES = [["technician", "فني"], ...(canInviteManager ? [["company_manager", "مدير"] as const] : [])] as const;
   const [state, action, pending] = useActionState(inviteMember, initialActionState);
   const [role, setRole] = useState("technician");
   const [custom, setCustom] = useState(false);
   const [perms, setPerms] = useState<Set<string>>(new Set(roleDefaults.technician ?? []));
   const v = (k: string) => (!state.ok ? String((state.values?.[k] as string | undefined) ?? "") : "");
   const toggle = (k: string) => setPerms((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const isManager = role === "company_manager";
+  const shown = (k: string) => isManager ? k !== "field.assigned" : !MANAGEMENT_PERMISSIONS.includes(k);
+  const canGrant = (k: string) => !grantable || grantable.includes(k);
 
   return (
     <div className="space-y-4">
@@ -77,18 +81,18 @@ export default function MemberInviteForm({ roleDefaults, available }: { roleDefa
         <div className="rounded-lg border border-slate-200 p-3">
           <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <input type="checkbox" checked={custom} onChange={(e) => setCustom(e.target.checked)} className="size-4 accent-[var(--brand)]" />
-            تخصيص الصلاحيات الآن (وإلا تُطبق الصلاحيات الافتراضية للدور)
+            {isManager ? "تحديد صلاحيات هذا المدير الآن (وإلا يملك كل الصلاحيات)" : "تخصيص الصلاحيات الآن (وإلا تُطبق الصلاحيات الافتراضية للفني)"}
           </label>
           {custom && (
             <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <input type="hidden" name="custom_permissions" value="1" />
-              {[...perms].map((p) => <input key={p} type="hidden" name="permissions" value={p} />)}
-              {permissionsByModule(available).filter((m) => m.permissions.length).map((m) => (
+              {[...perms].filter(shown).map((p) => <input key={p} type="hidden" name="permissions" value={p} />)}
+              {permissionsByModule(available).map((m) => ({ ...m, permissions: m.permissions.filter((p) => shown(p.key)) })).filter((m) => m.permissions.length).map((m) => (
                 <fieldset key={m.key} className="rounded-lg border border-slate-200 bg-white p-2">
                   <legend className="px-1 text-xs font-bold">{m.label}</legend>
                   {m.permissions.map((p) => (
-                    <label key={p.key} className="flex items-center gap-2 py-0.5 text-xs">
-                      <input type="checkbox" checked={perms.has(p.key)} onChange={() => toggle(p.key)} className="size-3.5 accent-[var(--brand)]" />
+                    <label key={p.key} className={`flex items-center gap-2 py-0.5 text-xs ${canGrant(p.key) ? "" : "text-slate-400"}`}>
+                      <input type="checkbox" checked={perms.has(p.key)} disabled={!canGrant(p.key)} onChange={() => toggle(p.key)} className="size-3.5 accent-[var(--brand)]" />
                       {p.label}
                     </label>
                   ))}

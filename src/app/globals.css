@@ -184,6 +184,15 @@ form[aria-busy="true"] fieldset, form[aria-busy="true"] .busy-dim { opacity: 0.7
 .print-doc .doc-photos img { display: block; width: 100%; height: 5.2cm; object-fit: contain; background: #f8fafc; }
 .print-doc .doc-photos figcaption { font-size: 9px; color: #334155; margin-top: 2px; overflow-wrap: anywhere; }
 .print-hide-photos .print-doc .doc-photos { display: none !important; }
+/* بيانات العميل وفروعه: أعمدة ثابتة على A4، والروابط الطويلة تلتف دون تجاوز الصفحة */
+.print-doc .branches-table { table-layout: fixed; }
+.print-doc .branches-table th:nth-child(1) { width: 4%; }
+.print-doc .branches-table th:nth-child(2) { width: 18%; }
+.print-doc .branches-table th:nth-child(3) { width: 13%; }
+.print-doc .branches-table th:nth-child(4) { width: 21%; }
+.print-doc .branches-table th:nth-child(5) { width: 29%; }
+.print-doc .branches-table th:nth-child(6) { width: 15%; }
+.print-doc .branches-table td { overflow-wrap: anywhere; }
 .print-doc .doc-card { border: 1px solid #64748b; border-radius: 4px; padding: 8px; break-inside: avoid; page-break-inside: avoid; }
 
 @media print {

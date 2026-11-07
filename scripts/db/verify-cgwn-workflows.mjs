@@ -52,12 +52,17 @@ try {
   const created = await rpc(owner, "platform_create_company", [`شركة تشغيل ${tag}`, `manager.${tag}@ays-test.invalid`, null, null, "الرياض", 24]);
   const co = created.data?.company_id;
   await rpc(mgr, "accept_company_invitation", [created.data?.token]);
-  for (const [uid, email, role] of [[tech, "tech", "technician"], [tech2, "tech2", "technician"], [acct, "accountant", "accountant"]]) {
+  // الدوران: مدير وفني (20261112000100). «المحاسب» هنا مدير إضافي بصلاحيات اطلاع فقط يحددها المدير الأساسي
+  const ACCT_PERMS = ["customers.view", "sites.view", "technicians.view", "catalog.view", "devices.view", "visits.view", "maintenance.view", "faults.view", "quotes.view", "reports.view", "reports.export", "reports.print"];
+  for (const [uid, email, role] of [[tech, "tech", "technician"], [tech2, "tech2", "technician"], [acct, "accountant", "company_manager"]]) {
     const inv = await rpc(mgr, "company_invite_member", [co, `${email}.${tag}@ays-test.invalid`, role, email, null, null, 24]);
+    if (uid === acct) await rpc(mgr, "company_set_invitation_permissions", [inv.data?.invitation_id, ACCT_PERMS]);
     await rpc(uid, "accept_company_invitation", [inv.data?.token]);
   }
   const members = (await c.query("select count(*)::int n from public.company_memberships where company_id = $1 and status = 'active'", [co])).rows[0].n;
   ok("تجهيز: شركة نشطة بمدير وفنيين ومحاسب", members === 4, members);
+  ok("تجهيز: «المحاسب» مدير غير أساسي بصلاحيات اطلاع فقط ولا يدير الفريق", (await rpc(acct, "company_has_perm", [co, "team.manage"])).data === false
+    && (await rpc(acct, "company_has_perm", [co, "customers.view"])).data === true);
 
   // العملاء (createCustomer / updateCustomer)
   const cust = await one(mgr, `insert into public.customers (company_id, name, customer_type, is_active, contact_name, phone, email, city, address,
@@ -253,9 +258,9 @@ try {
   await rpc(mgr, "company_set_member_status", [techMember, "active"]);
 
   // صفحة الدعوة بهوية الشركة (قبل الدخول): الهوية والتفاصيل برمز صالح فقط
-  const invL = (await rpc(mgr, "company_invite_member", [co, `landing.${tag}@ays-test.invalid`, "supervisor", "مشرف", null, null, 24])).data;
+  const invL = (await rpc(mgr, "company_invite_member", [co, `landing.${tag}@ays-test.invalid`, "technician", "فني", null, null, 24])).data;
   const land = (await rpc(null, "invitation_landing", [invL?.token])).data;
-  ok("صفحة الدعوة: الزائر يرى اسم الشركة والدور والصلاحيات", land?.status === "pending" && land?.company_name?.includes("شركة تشغيل") && land?.role === "supervisor" && land?.permissions?.length > 0);
+  ok("صفحة الدعوة: الزائر يرى اسم الشركة والدور والصلاحيات", land?.status === "pending" && land?.company_name?.includes("شركة تشغيل") && land?.role === "technician" && land?.permissions?.length > 0);
   ok("صفحة الدعوة: لا يُكشف البريد كاملًا ولا بيانات تشغيلية", !JSON.stringify(land).includes(`landing.${tag}@`) && !JSON.stringify(land).includes("عميل أ"));
   ok("صفحة الدعوة: رمز غير صحيح لا يكشف شيئًا", JSON.stringify((await rpc(null, "invitation_landing", ["Z".repeat(43)])).data) === JSON.stringify({ status: "invalid" }));
   await rpc(mgr, "company_revoke_invitation", [invL?.invitation_id]);
